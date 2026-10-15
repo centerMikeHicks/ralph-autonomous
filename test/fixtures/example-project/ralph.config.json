@@ -1,0 +1,9 @@
+{
+  "project": { "name": "example-project", "baseBranch": "main" },
+  "commands": { "test": "node --test" },
+  "tests": {
+    "globs": ["src/**/*.test.mjs"],
+    "ignore": ["**/node_modules/**"],
+    "layers": { "unit": ["src/**/*.test.mjs"], "integration": ["src/**/*.integration.test.mjs"], "e2e": ["e2e/**"] }
+  }
+}

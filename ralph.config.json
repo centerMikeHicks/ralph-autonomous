@@ -1,0 +1,7 @@
+{
+  "project": { "name": "ralph-autonomous", "baseBranch": "main", "specsDir": "specs", "stateDir": ".ralph" },
+  "commands": { "test": "node --test" },
+  "tests": { "globs": ["**/*.test.*", "**/*.spec.*"], "ignore": ["**/node_modules/**"] },
+  "gates": { "exitGate": ["test"], "baseHealth": { "checks": [] }, "requireAcceptanceBindings": true },
+  "tracker": { "provider": "none" }
+}

@@ -1,0 +1,60 @@
+{
+  "project": { "name": "my-project", "baseBranch": "main", "specsDir": "specs", "stateDir": ".ralph" },
+  "agent": {
+    "command": "claude",
+    "args": ["-p", "--dangerously-skip-permissions", "--output-format", "stream-json", "--verbose"],
+    "modelFlag": "--model",
+    "effortFlag": "--effort",
+    "subagentModelEnv": "CLAUDE_CODE_SUBAGENT_MODEL"
+  },
+  "models": {
+    "planning": "opus",
+    "execution": "sonnet",
+    "mechanical": "haiku",
+    "review": "opus",
+    "efforts": { "planning": "high", "execution": "medium", "mechanical": "low", "exitGate": "high" }
+  },
+  "commands": {
+    "test": "npm test",
+    "lint": "npm run lint",
+    "typecheck": null,
+    "build": "npm run build",
+    "affectedTest": null,
+    "format": null
+  },
+  "tests": {
+    "globs": ["**/*.test.*", "**/*.spec.*"],
+    "ignore": ["**/node_modules/**", "**/dist/**"],
+    "layers": {
+      "unit": ["src/**/*.test.*"],
+      "integration": ["src/**/*.integration.test.*", "test/integration/**"],
+      "e2e": ["e2e/**", "**/*.e2e.*"]
+    }
+  },
+  "gates": {
+    "exitGate": ["lint", "typecheck", "build", "test"],
+    "baseHealth": {
+      "checks": [
+        { "name": "lint", "command": "npm run lint", "timeoutMin": 10 },
+        { "name": "tests", "command": "npm test", "failPattern": "^not ok|\\bfailed\\b" }
+      ],
+      "link": ["node_modules"]
+    },
+    "requireAcceptanceBindings": true,
+    "reviewSubagent": "code-review"
+  },
+  "hooks": { "preCommit": [] },
+  "tracker": {
+    "provider": "none",
+    "jira": {
+      "project": "PROJ",
+      "site": "your-team.atlassian.net",
+      "cloudId": null,
+      "transitions": { "buildStarted": "In Progress", "exitGate": "Review Required", "designFinalized": "Ready For Development" }
+    }
+  },
+  "queue": { "buildChunk": 3, "maxBuild": 40, "maxReview": 8, "minFreeGb": 4, "maxRetries": 3, "watchTimeoutMin": 45 },
+  "sweep": { "timeoutMin": 180, "stallMin": 20, "ownerProcessNames": ["claude"] },
+  "review": { "scopeAuditAfterPasses": 5 },
+  "drift": { "warnCommits": 50 }
+}

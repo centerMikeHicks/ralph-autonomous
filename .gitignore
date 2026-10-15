@@ -1,0 +1,18 @@
+# Per-run state the loops churn (the ledger, ACTIVE_SPEC and archived plans are meant to be committed)
+.ralph/IMPLEMENTATION_PLAN.md
+.ralph/ITERATION_STATUS.json
+.ralph/PROGRESS.md
+.ralph/iterations.jsonl
+.ralph/USAGE_LOG.md
+.ralph/loop-events.jsonl
+.ralph/.loop-heartbeat
+.ralph/logs/
+.ralph/base-health.json
+.ralph/tracker/
+
+# Scratch space for runners, worktrees and agents
+.claude-temp/
+
+*.log
+logs/
+node_modules/

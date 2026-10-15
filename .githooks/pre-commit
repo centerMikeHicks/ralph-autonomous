@@ -1,0 +1,22 @@
+#!/bin/sh
+# Pre-commit gate (POSIX sh; works under Git Bash on Windows).
+#
+# Runs at the one point an agent cannot talk its way past: the commit.
+#   1. scripts/verify-jira-sync.mjs  refuses while a tracker-sync degradation marker stands
+#                                    (a no-op unless tracker.provider is "jira")
+#   2. scripts/lib/run-precommit.mjs runs the commands in ralph.config.json hooks.preCommit
+# Bypassing with --no-verify defeats the gate; do not.
+#
+# Install once per clone:  node scripts/install-hooks.mjs   (npm run hooks:install)
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$root" || exit 1
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[pre-commit] BLOCKED: node is not on PATH, so the commit gates cannot run."
+  exit 1
+fi
+
+node scripts/verify-jira-sync.mjs || exit 1
+node scripts/lib/run-precommit.mjs || exit 1
+exit 0

@@ -1,0 +1,18 @@
+{
+  "name": "ralph-autonomous",
+  "version": "1.0.0",
+  "description": "Spec-driven autonomous delivery: plan, build and review specs with an AI coding agent in fresh-context loops.",
+  "author": "Mike Hicks",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node scripts/lib/run-tests.mjs",
+    "doctor": "node scripts/ralph-doctor.mjs",
+    "queue:start": "node scripts/ralph-queue.cjs start",
+    "queue:status": "node scripts/ralph-queue.cjs status",
+    "queue:watch": "node scripts/ralph-queue.cjs watch",
+    "queue:stop": "node scripts/ralph-queue.cjs stop",
+    "hooks:install": "node scripts/install-hooks.mjs"
+  }
+}
