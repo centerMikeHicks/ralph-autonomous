@@ -167,6 +167,34 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 0.88rem; color: var(--muted); display: grid; gap: 6px; }
 @media (prefers-reduced-motion: no-preference) { .fill { transition: width 0.6s ease; } }
+@page { size: Letter; margin: 14mm 14mm 16mm; }
+@media print {
+  :root, :root[data-theme="dark"] {
+    --bg: #ffffff; --surface: #ffffff; --ink: #141a26; --muted: #5a6478; --rule: #dde1e8;
+    --accent: #2c4bd1; --accent-soft: #e6ebfb; --st-drafted: #8a93a6; --st-planned: #2c4bd1;
+    --st-built: #b86e00; --st-reviewed: #1d7a4a; --st-shipped: #141a26; --warn: #b3261e; --code-bg: #eef0f4;
+    color-scheme: light;
+  }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-size: 10.5pt; padding: 0; }
+  .wrap { max-width: none; }
+  header { padding-block: 0 4px; }
+  section { padding-block: 22px 0; gap: 12px; }
+  h1 { font-size: 26pt; }
+  h2 { font-size: 16pt; break-after: avoid; }
+  h3 { break-after: avoid; }
+  .cmd button { display: none; }
+  .cmd pre { padding-right: 12px; white-space: pre-wrap; }
+  tr, .tick, .panel, .state, .fig, .steps li, .pair > div, .warnbox, .cmd, .line { break-inside: avoid; }
+  .tablebox { overflow: visible; }
+  a { color: var(--ink); text-decoration: none; }
+  .ledger { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .ledger .state { padding: 10px 10px 12px 0; border-bottom: 0; }
+  .ledger .state + .state { padding-left: 10px; border-left: 1px solid var(--rule); }
+  .state .what { font-size: 9pt; }
+  .figures { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tick .line, .line { white-space: pre-wrap !important; overflow: visible !important; overflow-wrap: anywhere; }
+}
 </style>
 </head>
 <body>
