@@ -169,9 +169,24 @@ node scripts/ralph-queue.cjs stop        # finish the current invocation, then e
 ```
 
 A spec parks (`[!]` in the queue) when it needs a person; the skill decides what the standards decide and
-leaves the rest for you with a reason. When you return, read `.ralph/PROGRESS.md`, the ledger and the queue.
+leaves the rest for you with a reason.
+
+**When you come back**, start with one command:
+
+```bash
+node scripts/ralph-decisions.mjs
+```
+
+It lists what needs you (parked specs, open `[product]` questions, review findings left for a person),
+then every call made on your behalf (the supervisor's `[REVIEW]` entries, plan decisions, `Tooling:`
+commits, scope added under `[REVIEW: SCOPE]`), then findings deferred as outside the spec. Answer the
+first group and set parked queue lines back to `[ ]`; mark accepted decisions `[REVIEWED]`; then read the
+draft pull request. [docs/DECISIONS.md](docs/DECISIONS.md) explains each record and how to overturn a call.
 
 ## 11. Lanes: specs in parallel
+
+[docs/LANES.md](docs/LANES.md) is the full guide: when a lane is worth it, how to split specs, giving each
+lane its own environment, and every merge-back step. The short version:
 
 One working tree runs one loop at a time. For two specs at once, give each its own **lane**: a sibling
 worktree on its own branch with its own queue and runner.

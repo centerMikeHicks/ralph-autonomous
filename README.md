@@ -73,6 +73,79 @@ sequenceDiagram
 - **Deliberately not a manual gate:** the plan. The checks decide whether a plan covers its spec; you
   may read and edit it, but nothing waits for you.
 
+## How it stays in bounds
+
+### Scope: what it builds, what it files, and who widens a spec
+
+The spec's Problem Statement, Scope and Success Criteria are a boundary the loops never widen. Every
+finding from build or review is sorted before anyone acts on it:
+
+| Finding | What happens |
+|---------|--------------|
+| **Inside** the spec's scope | Fixed now, properly, with a test. |
+| **Outside, but ship-blocking** (this spec's deliverable would be unsafe or wrong without it) | Fixed now, and tagged `[REVIEW: SCOPE]` with the reason, so you can see every time it went outside the lines. |
+| **Outside and pre-existing** (true before this spec touched anything) | **Not built.** Filed as a candidate spec in the plan, and as a Jira comment or linked issue when Jira is on, with the residual risk stated. |
+
+Only a person widens a spec. If review keeps finding work, it stops after five passes and asks you one
+batched question (accept the risk, file follow-up specs, or widen the spec), and the queue parks the spec
+after eight review passes whatever happens.
+
+### Decisions: who makes them, where they are written, how you review them
+
+- **You** decide what the feature is, sign approvals and waivers, and take every outward-facing action.
+- **The supervising skill** decides only what your written `standards/` or recorded decisions already
+  decide, and tags each call `[REVIEW]` with the rule it used and how to undo it.
+- **The loops** decide how to build (where code goes, which pattern) and record each call as a numbered
+  decision (`D7`) in the plan with the rule behind it.
+
+Everything lands in files that are committed with the work: the spec's Open Questions become a dated
+decision log, the plan carries its decisions, commit messages carry the rest. When you come back, one
+command lists it all, with what needs you first:
+
+```bash
+node scripts/ralph-decisions.mjs          # NEEDS YOU, DECIDED FOR YOU, DEFERRED
+```
+
+Mark a decision `[REVIEWED]` when you accept it; overturn it by changing the spec or plan and
+re-queueing. [docs/DECISIONS.md](docs/DECISIONS.md) has the full decision rights, every record and the
+review routine.
+
+### Lanes: specs in parallel
+
+One worktree runs one loop at a time. To build two or three independent specs at once, give each a
+**lane**: a sibling git worktree on its own branch with its own queue and runner
+(`node scripts/new-lane.mjs --name backend --base main`).
+
+- **When:** independent specs that touch different files, a machine with room for another agent and test
+  run, and an environment (ports, databases, test accounts) the lane can have to itself.
+- **How to split:** by the files the specs touch, dependent specs in the same lane, never a lane from a
+  lane. Two or three lanes, the integration worktree included.
+- **Merging back:** after each spec reaches `reviewed`, one lane at a time, with a person's approval.
+  Stop both runners, merge, keep the integration plan, merge the ledger row by row, verify, then sync
+  the other lanes. `scripts/lane-merge-notes.mjs` prints the checklist.
+
+[docs/LANES.md](docs/LANES.md) covers when to use them, environment isolation, every merge step and
+what to expect to conflict.
+
+### Jira: optional
+
+With `tracker.provider: "none"` (the default) nothing mentions a tracker. With `"jira"` and the Atlassian
+MCP server connected, each spec is bound to an issue (`/design` creates one or binds an existing key) and
+the loops keep it current:
+
+| When | Jira |
+|------|------|
+| `/design` saves the spec | moves to your "ready for development" status, comment with the spec path |
+| First build iteration | moves to "in progress" |
+| Exit Gate passes | moves to "review required", comment with phases done and each gate's result |
+| Every review pass | comment: fixes applied, items left for a person, findings deferred as outside the spec |
+| An out-of-scope finding worth tracking | a new linked issue |
+
+Transitions are looked up by status name, so your workflow's names go in the config. The loops never
+close, delete, reassign or reprioritise issues. If Jira is unreachable the loop keeps working, writes a
+`JIRA DEGRADED` marker, and the commit hook refuses commits until the missed update is retried, so a
+ticket is never silently left behind. Setup is in [GETTING_STARTED.md](GETTING_STARTED.md#12-optional-a-jira-tracker).
+
 ## What to expect
 
 - A spec takes **dozens of iterations**, not a handful. Most of that is re-verifying, not writing code.
@@ -151,6 +224,7 @@ scripts/
   base-health.mjs                was the base branch already red, and did this spec make it redder?
   lint-spec.mjs                  structural lint of a spec
   verify-jira-sync.mjs           refuses commits while tracker sync is degraded (Jira only)
+  ralph-decisions.mjs            everything decided, asked or deferred, for a person to review
   ralph-doctor.mjs, install-hooks.mjs, new-lane.mjs, lane-merge-notes.mjs
   hooks/require-agent-model.cjs  Claude Code hook: every subagent launch names its model
 .githooks/pre-commit         tracker gate, then your own hooks.preCommit commands
@@ -158,7 +232,7 @@ scripts/
 standards/                   how to write your rules corpus, with one example rule
 templates/                   spec, ledger, queue, config (with every key explained)
 examples/                    a spec at realistic size
-docs/                        ARCHITECTURE, RUNTIME, DRIVERS, SKILLS
+docs/                        ARCHITECTURE, DECISIONS, LANES, RUNTIME, DRIVERS, SKILLS
 test/                        node:test suites and a small worked example project
 ```
 
@@ -167,6 +241,8 @@ test/                        node:test suites and a small worked example project
 | Read | When |
 |------|------|
 | [GETTING_STARTED.md](GETTING_STARTED.md) | Setting it up and running your first spec |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Who decides what, the scope rules, where decisions are recorded, how to review and overturn them |
+| [docs/LANES.md](docs/LANES.md) | Running specs in parallel: when, how to split, environment isolation, merging back |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it fits together, and the failure each piece guards against |
 | [ralph/CONVENTIONS.md](ralph/CONVENTIONS.md) | The rules the agent follows: phase sizing, verification tiers, formats |
 | [docs/SKILLS.md](docs/SKILLS.md) | `/design`, the `autonomous` skill, `/feature-dev`, the review agent |

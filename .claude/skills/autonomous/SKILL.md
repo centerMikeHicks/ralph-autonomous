@@ -36,6 +36,7 @@ built inline because deferring feels like a shortcut. Deferring correctly is not
 3. **Know where decisions live.** The user's recorded decisions (for example
    `.claude-temp/<topic>/DECISIONS.md`) and the **talk log** you write your own calls to (for example
    `.claude-temp/<topic>/TALK.md`). Create both if missing; ask the user for any decision you need.
+   Talk log entries use the format in section 6, so `node scripts/ralph-decisions.mjs` can list them.
 4. **Draft pull request.** If the branch has an open PR, make it a draft before starting (with GitHub:
    `gh pr view --json isDraft`, `gh pr ready --undo <n>`). Every push to a ready-for-review PR starts the
    project's full CI. Log the conversion; leave marking it ready to the user.
@@ -132,7 +133,8 @@ Place the finding against the spec's own stated boundary (Problem Statement, Sco
 **You can decide it** when the answer follows from the project's `standards/`, the user's recorded
 decisions or an existing pattern, **and** it is a proper fix rather than a shortcut. Record the decision
 where the loop will read it (the plan item, or a spec amendment through `/design --bind` done by a
-subagent with an explicit `model`), log it in the talk log flagged `[REVIEW]` if it is a judgement call,
+subagent with an explicit `model`; in the spec, a ticked Open Questions entry tagged `[REVIEW]` that says
+you decided it, when, and from which rule), log it in the talk log flagged `[REVIEW]` if it is a judgement call,
 set the queue line back to `- [ ]`, and let the runner pick it up.
 
 **It needs the user**, always, when it involves: an **approval or waiver** (it needs their identity),
@@ -160,9 +162,34 @@ the talk log **and** to the spec's plan (`.ralph/IMPLEMENTATION_PLAN.md`, an Ope
 
 ## 6. Reporting
 
+### Talk log entry format
+
+One bullet per decision or question, newest last, each on one line (continuation lines indented):
+
+```markdown
+- [REVIEW] 2026-10-15T21:40 specs/x.md — <what you decided>. Rule: <the standard, recorded user
+  decision or existing pattern that decided it>. Recorded: <where the loop will read it: spec Q4 / plan
+  D7>. Undo: <what to change to reverse it>.
+- [REVIEW: SCOPE] 2026-10-15T23:05 specs/x.md — <scope added beyond the spec>. Why now: <one line on why
+  it could not be deferred>. Recorded: <commit sha or plan row>.
+- [ASK] 2026-10-15T21:15 specs/y.md — <the question only the user can answer>. Options: <a / b>.
+  Blocks: <which phase, or "nothing; parked anyway">.
+```
+
+`[REVIEW]` is a judgement call the user should read. `[REVIEW: SCOPE]` is a judgement call that added
+build scope. `[ASK]` is a question waiting for them. Routine notes (a spec finished, a runner restarted)
+are plain bullets with no tag. The user marks an entry they accept by changing its tag to `[REVIEWED]`;
+never do that yourself.
+
+**The talk log is the index, not the record.** It usually lives in an uncommitted folder. Every decision
+that changes what gets built must also be written where the loop and git will keep it: the spec's Open
+Questions (ticked, with who decided and when, and `[REVIEW]` when it was you) or the plan's
+`## Decisions`. A call that exists only in the talk log is lost when the worktree is.
+
 Keep the talk log current: each spec done (commits, cost from `.ralph/USAGE_LOG.md`), each decision you
 made (`[REVIEW]`), each question only the user can answer, and anything a loop found outside its spec.
-When the user returns, lead with what needs them, then what shipped.
+When the user returns, run `node scripts/ralph-decisions.mjs` and lead with its NEEDS YOU list, then
+the decisions you made, then what shipped.
 
 - Tag any `[REVIEW]` entry that added build scope beyond the spec's boundary `[REVIEW: SCOPE]` with the
   one-line reason it could not be deferred. "Where did the time go" is then answerable from the log.

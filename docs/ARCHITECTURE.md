@@ -56,6 +56,7 @@ cannot diverge. Gates take their configuration from `ralph.config.json` and read
 | `.ralph/base-health.json` | `scripts/base-health.mjs` | Base vs HEAD measurements. |
 | `.ralph/tracker/<spec>.json` | the agent (jira only) | Idempotent tracker event log. |
 | `.claude-temp/ralph-queue/` | the queue runner | `QUEUE.md` (input and status board), `state.json`, `events.jsonl`, `STOP`. |
+| `.claude-temp/<topic>/TALK.md` | the `autonomous` skill | Its `[REVIEW]`, `[REVIEW: SCOPE]` and `[ASK]` entries; an index of decisions also recorded in the spec or plan. `scripts/ralph-decisions.mjs` reads it with the spec, plan, queue and git log ([DECISIONS.md](DECISIONS.md)). |
 
 ## The ledger as a state machine
 
@@ -122,8 +123,10 @@ and then your `hooks.preCommit` commands.
 ## Scope discipline
 
 A spec's Scope section is a boundary the loops respect. Build and review do not widen it. A finding is
-bucketed **inside** the spec's scope (fix it), **outside and ship-blocking** (park the spec, ask), or **outside
-and pre-existing** (record it durably, do not fix it here). The `autonomous` skill applies the scope gate when
+bucketed **inside** the spec's scope (fix it), **outside and ship-blocking** (fix it and tag it `[REVIEW: SCOPE]`
+with the reason, so the extra scope is visible to a person), or **outside and pre-existing** (record it durably
+as a candidate spec, do not fix it here). Only a person widens a spec. [DECISIONS.md](DECISIONS.md) has the
+full rules and where each is recorded. The `autonomous` skill applies the scope gate when
 a spec parks, and after `review.scopeAuditAfterPasses` review passes on one spec it stops fixing and
 produces an audit instead, because a spec that keeps producing findings is usually a spec that has outgrown its
 contract. Infrastructure and tooling specs are reported apart from product specs, since they compete for the
@@ -145,6 +148,9 @@ The kit automates the loop, not the judgement that sits above it.
   environments, skipping hooks. Forbidden in the prompts; enforce with credentials and branch protection too.
 
 ## Lanes
+
+The full operating guide is [LANES.md](LANES.md).
+
 
 A lane is a sibling git worktree on branch `<base>-lane-<name>` with its own queue and runner, created by
 `scripts/new-lane.mjs` (`--dry-run` shows the plan). Parallelise specs, never phases of one spec. Each lane needs
