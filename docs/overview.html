@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ralph Autonomous Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=Literata:opsz,wght@7..72,400;7..72,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a single reading column (~68ch) with wide "plates" that break out for the ledger strip, the night timeline and the numbers. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #141a26;
+  --muted: #5a6478;
+  --rule: #dde1e8;
+  --accent: #2c4bd1;
+  --accent-soft: #e6ebfb;
+  --st-drafted: #8a93a6;
+  --st-planned: #2c4bd1;
+  --st-built: #b86e00;
+  --st-reviewed: #1d7a4a;
+  --st-shipped: #141a26;
+  --warn: #b3261e;
+  --code-bg: #eef0f4;
+  --f-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Literata", Georgia, "Times New Roman", serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f131b; --surface: #161b25; --ink: #e7eaf0; --muted: #9aa3b5; --rule: #2a3140;
+    --accent: #8fa6ff; --accent-soft: #1d2540;
+    --st-drafted: #8a93a6; --st-planned: #8fa6ff; --st-built: #f0a742; --st-reviewed: #4cc98a; --st-shipped: #e7eaf0;
+    --warn: #ff8a80; --code-bg: #1c2230; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f131b; --surface: #161b25; --ink: #e7eaf0; --muted: #9aa3b5; --rule: #2a3140;
+  --accent: #8fa6ff; --accent-soft: #1d2540;
+  --st-drafted: #8a93a6; --st-planned: #8fa6ff; --st-built: #f0a742; --st-reviewed: #4cc98a; --st-shipped: #e7eaf0;
+  --warn: #ff8a80; --code-bg: #1c2230; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+.col { max-width: 68ch; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 800; letter-spacing: -0.01em; }
+h3 { font-size: 1.08rem; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--f-mono); font-size: 0.84em; }
+code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 4px; }
+.eyebrow {
+  font-family: var(--f-mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.lede { font-size: 1.16rem; color: var(--ink); }
+.muted { color: var(--muted); }
+section { padding-block: 56px 0; display: grid; gap: 20px; }
+section > .col { display: grid; gap: 14px; }
+
+/* hero */
+header { padding-block: 56px 8px; display: grid; gap: 18px; }
+header .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+
+/* ledger strip */
+.ledger { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; margin-top: 24px;
+  border-top: 2px solid var(--ink); }
+.state { padding: 14px 14px 16px 0; display: grid; gap: 6px; align-content: start; position: relative; min-width: 0; }
+.state + .state { padding-left: 14px; border-left: 1px solid var(--rule); }
+.state .tag { font-family: var(--f-mono); font-weight: 600; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 8px; }
+.state .tag::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.state .who { font-family: var(--f-display); font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--c); }
+.state .what { font-size: 0.92rem; color: var(--muted); }
+.state .gate { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); border-top: 1px dashed var(--rule); padding-top: 6px; margin-top: 4px; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .ledger { grid-template-columns: 1fr; }
+  .state, .state + .state { padding: 12px 0; border-left: 0; border-bottom: 1px solid var(--rule); }
+}
+
+/* two ideas */
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.pair > div { display: grid; gap: 8px; align-content: start; }
+.pair .n { font-family: var(--f-display); font-weight: 800; font-size: 2.2rem; color: var(--accent); line-height: 1; }
+@media (max-width: 700px) { .pair { grid-template-columns: 1fr; } }
+
+/* claims table */
+.tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--f-display); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* night timeline */
+.night { display: grid; gap: 0; border-left: 2px solid var(--rule); margin-left: 6px; }
+.tick { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 16px; padding: 0 0 18px 18px; position: relative; }
+.tick::before { content: ""; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--c, var(--muted)); }
+.tick time { font-family: var(--f-mono); font-size: 0.85rem; color: var(--muted); padding-top: 1px; font-variant-numeric: tabular-nums; }
+.tick .body { display: grid; gap: 4px; min-width: 0; }
+.tick .line { font-family: var(--f-mono); font-size: 0.8rem; background: var(--code-bg); padding: 6px 10px; border-radius: 6px; overflow-x: auto; white-space: pre; }
+.example-note { font-family: var(--f-mono); font-size: 0.74rem; color: var(--muted); }
+
+/* numbers */
+.figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.fig { padding: 16px 16px 16px 0; display: grid; gap: 4px; }
+.fig + .fig { padding-left: 16px; border-left: 1px solid var(--rule); }
+.fig b { font-family: var(--f-display); font-weight: 800; font-size: 2rem; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.fig span { font-size: 0.86rem; color: var(--muted); }
+@media (max-width: 760px) {
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fig:nth-child(3) { padding-left: 0; border-left: 0; }
+  .fig:nth-child(n+3) { border-top: 1px solid var(--rule); }
+}
+.bars { display: grid; gap: 10px; }
+.bar { display: grid; grid-template-columns: 180px minmax(0, 1fr) 56px; gap: 12px; align-items: center; font-size: 0.9rem; }
+.bar .track { height: 14px; background: var(--code-bg); border-radius: 3px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--c, var(--accent)); }
+.bar .v { font-family: var(--f-mono); font-size: 0.82rem; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .bar { grid-template-columns: 1fr 48px; } .bar .track { grid-column: 1 / -1; grid-row: 2; } }
+.source { font-family: var(--f-mono); font-size: 0.74rem; color: var(--muted); }
+
+/* split: automated vs person */
+.split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 18px 20px; display: grid; gap: 10px; align-content: start; }
+.panel ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: 0.95rem; }
+.panel.person { border-color: var(--accent); }
+@media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+/* adoption steps */
+.steps { display: grid; gap: 14px; counter-reset: s; list-style: none; padding: 0; margin: 0; }
+.steps li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; counter-increment: s; }
+.steps li::before { content: counter(s); font-family: var(--f-display); font-weight: 800; color: var(--accent); font-size: 1.2rem; line-height: 1.4; }
+.steps .body { display: grid; gap: 6px; min-width: 0; }
+.cmd { position: relative; }
+.cmd pre { margin: 0; font-family: var(--f-mono); font-size: 0.8rem; background: var(--code-bg); padding: 10px 70px 10px 12px; border-radius: 6px; overflow-x: auto; }
+.cmd button {
+  position: absolute; top: 6px; right: 6px; font-family: var(--f-mono); font-size: 0.72rem;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 3px 8px; cursor: pointer;
+}
+.cmd button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.warnbox { border-left: 3px solid var(--warn); padding: 4px 0 4px 16px; display: grid; gap: 8px; }
+.warnbox h3 { color: var(--warn); }
+.warnbox ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: 0.95rem; }
+
+.docs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; }
+.docs div { display: grid; gap: 2px; font-size: 0.92rem; }
+.docs .mono { font-weight: 600; color: var(--ink); }
+@media (max-width: 700px) { .docs { grid-template-columns: 1fr; } }
+
+footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 0.88rem; color: var(--muted); display: grid; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) { .fill { transition: width 0.6s ease; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">ralph-autonomous · field guide</div>
+  <h1>Specs in the evening, reviewed branches in the morning.</h1>
+  <div class="col">
+    <p class="lede">A kit for spec-driven autonomous delivery with Claude Code. A person writes a spec. An agent plans, builds and reviews it in short loops that each start from a fresh context, while a queue runner carries several specs through the night and small scripts check every claim the agent makes.</p>
+  </div>
+  <div class="meta">
+    <span class="eyebrow">Node 20 · no dependencies</span>
+    <span class="eyebrow">Windows · macOS · Linux</span>
+    <span class="eyebrow">MIT licence</span>
+  </div>
+
+  <div class="ledger" role="list" aria-label="The ledger states a spec moves through">
+    <div class="state" role="listitem" style="--c: var(--st-drafted)">
+      <span class="who">Person + agent</span>
+      <span class="tag">drafted</span>
+      <span class="what"><code>/design</code> interviews you, reads the code and writes the contract.</span>
+      <span class="gate">lint-spec</span>
+    </div>
+    <div class="state" role="listitem" style="--c: var(--st-planned)">
+      <span class="who">Agent</span>
+      <span class="tag">planned</span>
+      <span class="what">Gap analysis and 3–6 phases, each task naming its files and tests.</span>
+      <span class="gate">verify-plan-completeness</span>
+    </div>
+    <div class="state" role="listitem" style="--c: var(--st-built)">
+      <span class="who">Agent, many times</span>
+      <span class="tag">built</span>
+      <span class="what">One task per iteration: failing tests first, then code, then a commit.</span>
+      <span class="gate">verify-plan-ticks · acceptance-bindings · exit gate</span>
+    </div>
+    <div class="state" role="listitem" style="--c: var(--st-reviewed)">
+      <span class="who">Agent</span>
+      <span class="tag">reviewed</span>
+      <span class="what">The whole diff read once, fixed in slices, findings sorted by scope.</span>
+      <span class="gate">gates · review agent · review cap</span>
+    </div>
+    <div class="state" role="listitem" style="--c: var(--st-shipped)">
+      <span class="who">Person</span>
+      <span class="tag">shipped</span>
+      <span class="what">You read it, sign what needs a name, and merge.</span>
+      <span class="gate">your branch protection</span>
+    </div>
+  </div>
+</header>
+
+<section aria-labelledby="ideas">
+  <h2 id="ideas">Two ideas carry the design</h2>
+  <div class="pair">
+    <div>
+      <span class="n">1</span>
+      <h3>An agent with an empty head cannot drift</h3>
+      <p>Every iteration is a new process that reads its state from disk: the spec, the plan, a status file, git. Nothing important lives in a context window, so a crash, a reboot or a bad iteration costs one iteration, not the night.</p>
+    </div>
+    <div>
+      <span class="n">2</span>
+      <h3>An agent's claim is not evidence</h3>
+      <p>Each claim that matters has a script that checks it against the files, the tests or git, and undoes the claim if it does not hold. The agent can say a phase is done; the phase is ticked only when the check agrees.</p>
+    </div>
+  </div>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>The agent says</th><th>Checked by</th><th>If it does not hold</th></tr></thead>
+      <tbody>
+        <tr><td>"The plan covers the spec."</td><td><code>verify-plan-completeness</code></td><td>Lists every requirement no task builds; the plan cannot be marked ready.</td></tr>
+        <tr><td>"This phase is done."</td><td><code>verify-plan-ticks</code></td><td>Un-ticks the phase and writes down why.</td></tr>
+        <tr><td>"This test proves the criterion."</td><td><code>verify-acceptance-bindings</code></td><td>Flags the row as missing, skipped, assertion-free or tested at the wrong layer.</td></tr>
+        <tr><td>"Those failures were already there."</td><td><code>base-health --compare</code></td><td>Measures the base branch in its own worktree; only a regression fails.</td></tr>
+        <tr><td>"The tests pass." (with no test command set)</td><td>the Exit Gate</td><td>Reported as "not configured", never as passing.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="col muted">The loop technique itself, Ralph, is Geoffrey Huntley's: run a coding agent in a loop against a prompt and files on disk. This kit is one team's answer to what it takes to leave that running unattended on a real codebase.</p>
+</section>
+
+<section aria-labelledby="night">
+  <h2 id="night">What a night looks like</h2>
+  <p class="example-note">Illustrative timeline · times and spec names are examples</p>
+  <div class="night">
+    <div class="tick" style="--c: var(--st-drafted)">
+      <time>17:40</time>
+      <div class="body">
+        <p>You tell Claude Code: "work autonomously through these three specs". The <code>autonomous</code> skill runs its pre-flight: clean index, no other loop, doctor, how far the branch has drifted from main.</p>
+      </div>
+    </div>
+    <div class="tick" style="--c: var(--st-drafted)">
+      <time>17:44</time>
+      <div class="body">
+        <p>It writes the queue and starts a detached runner that will outlive the session and keep the machine awake.</p>
+        <div class="line">- [ ] specs/team-invitations.md
+- [ ] specs/export-verbose-flag.md
+- [ ] specs/audit-log-retention.md</div>
+      </div>
+    </div>
+    <div class="tick" style="--c: var(--st-planned)">
+      <time>17:52</time>
+      <div class="body"><p>Plan mode on the first spec: gap analysis, base-branch health, five phases. The completeness check passes. Ledger: <code>planned</code>.</p></div>
+    </div>
+    <div class="tick" style="--c: var(--st-built)">
+      <time>18:00</time>
+      <div class="body"><p>Build iterations begin, three per invocation. Each writes failing tests named exactly as the spec names them, implements, runs only the checks that prove its slice, and commits.</p></div>
+    </div>
+    <div class="tick" style="--c: var(--warn)">
+      <time>21:15</time>
+      <div class="body">
+        <p>The second spec hits a question only a person can answer. The loop records it and exits <code>blocked</code>; the runner parks it and moves on.</p>
+        <div class="line">- [!] specs/export-verbose-flag.md — blocked in build: [product] should --verbose include timings?</div>
+      </div>
+    </div>
+    <div class="tick" style="--c: var(--st-built)">
+      <time>23:23</time>
+      <div class="body"><p>The OS kills the loop under memory pressure. The runner waits for free memory and resumes from the ledger. Nothing is lost but one iteration.</p></div>
+    </div>
+    <div class="tick" style="--c: var(--st-reviewed)">
+      <time>02:40</time>
+      <div class="body"><p>First spec reaches its Exit Gate: full lint, typecheck, build and test, every acceptance row bound, one review by the review agent. Ledger: <code>built</code>. Review passes follow; a clean one sets <code>reviewed</code>.</p></div>
+    </div>
+    <div class="tick" style="--c: var(--st-shipped)">
+      <time>08:30</time>
+      <div class="body"><p>You read the talk log. It leads with what needs you (one product question, one judgement call flagged <code>[REVIEW]</code>), then what finished. You answer, set the parked line back to <code>[ ]</code>, and open the draft PR for the reviewed spec.</p></div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="numbers">
+  <h2 id="numbers">What to expect</h2>
+  <div class="pair">
+    <div>
+      <h3>Dozens of iterations per spec</h3>
+      <p>Not a handful. A small spec with a clean contract finishes quickly; one that crosses several layers or needs end-to-end tests takes much longer, and most of the extra is re-verifying, not writing code.</p>
+    </div>
+    <div>
+      <h3>Review is the expensive mode</h3>
+      <p>It runs on the largest model and reads the whole diff, and left alone it keeps finding things. The review cap and the scope audit exist to stop it running on.</p>
+    </div>
+    <div>
+      <h3>Real specs run to a few hundred lines</h3>
+      <p>That is what it takes for the loop to build without asking: the mandatory questions answered, acceptance tests on every phase, and a scope that says what is out. The repository includes one at realistic size.</p>
+    </div>
+    <div>
+      <h3>Most overnight stops are the environment</h3>
+      <p>An end-to-end stack that is down, a test service out of quota, a VPN that is not up, a waiver only a person can sign. The loop is only as autonomous as the environment its tests need.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="who">
+  <h2 id="who">What is automated, and what stays yours</h2>
+  <div class="split">
+    <div class="panel">
+      <span class="eyebrow">The kit does</span>
+      <ul>
+        <li>Planning, building and reviewing, and the checks on all three</li>
+        <li>Carrying a queue of specs from one to the next</li>
+        <li>Recovering from crashes, reboots and usage limits</li>
+        <li>Keeping the machine awake and killing orphaned processes</li>
+        <li>Deciding what your written standards already decide, and logging each call</li>
+        <li>Telemetry: time, cost and outcome per iteration</li>
+      </ul>
+    </div>
+    <div class="panel person">
+      <span class="eyebrow">A person does</span>
+      <ul>
+        <li>Decides what the feature is: every question tagged <code>[product]</code></li>
+        <li>Signs approvals and waivers; they carry a name</li>
+        <li>Answers parked specs and sets them back to <code>[ ]</code></li>
+        <li>Runs the scope audit when review hits its cap</li>
+        <li>Reads the talk log for judgement calls made in their absence</li>
+        <li>Merges and ships</li>
+      </ul>
+    </div>
+  </div>
+  <p class="col muted">The plan is deliberately not a manual gate. The checks decide whether a plan covers its spec; you may read and edit it, but nothing waits for you.</p>
+</section>
+
+<section aria-labelledby="scope">
+  <h2 id="scope">Scope: what it builds, and what it files instead</h2>
+  <div class="col"><p>A spec's problem statement, scope and success criteria are a boundary the loops never widen. Every finding from build or review is sorted before anyone acts on it.</p></div>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>The finding is</th><th>What happens</th><th>Where you see it</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Inside</strong> the spec's scope</td><td>Fixed now, properly, with a test.</td><td>The fix commit</td></tr>
+        <tr><td><strong>Outside, but ship-blocking</strong>: this spec's deliverable would be unsafe or wrong without it</td><td>Fixed now, and flagged with the reason it could not wait.</td><td><code>[REVIEW: SCOPE]</code> in the commit and the decision report</td></tr>
+        <tr><td><strong>Outside and pre-existing</strong>: true before this spec touched anything</td><td><strong>Not built.</strong> Filed as a candidate spec with the residual risk; a linked Jira issue when Jira is on.</td><td>DEFERRED in the decision report</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col"><p><strong>Only a person widens a spec.</strong> If review keeps finding work, it stops after five passes and asks one batched question: accept the risk, file follow-up specs, or widen the spec. The queue parks the spec after eight review passes regardless.</p></div>
+</section>
+
+<section aria-labelledby="decisions">
+  <h2 id="decisions">Decisions it makes, and how you review them</h2>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Who</th><th>Decides</th><th>Recorded as</th></tr></thead>
+      <tbody>
+        <tr><td><strong>You</strong></td><td>What the feature is. Approvals and waivers. Merging, releasing, infrastructure, anything outward-facing.</td><td>Your answer in the spec's Open Questions, dated</td></tr>
+        <tr><td><strong>The supervising skill</strong></td><td>Only what your written standards or recorded decisions already decide.</td><td><code>[REVIEW]</code> entries naming the rule used and how to undo it</td></tr>
+        <tr><td><strong>The loops</strong></td><td>How to build: where code goes, which pattern, how to split a task. Fixes to their own tooling.</td><td>Numbered plan decisions (<code>D7</code>) with the rule behind each; <code>Tooling:</code> commits</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col" style="display:grid; gap:12px">
+    <p>The records are committed with the work: a spec's Open Questions grow into a dated decision log, the plan carries its decisions, commit messages carry the rest. When you come back, one command lists everything, with what needs you first:</p>
+    <div class="cmd"><pre>node scripts/ralph-decisions.mjs</pre><button type="button" data-copy>Copy</button></div>
+    <div class="line mono" style="background:var(--code-bg); padding:10px 12px; border-radius:6px; overflow-x:auto; white-space:pre; font-size:0.78rem">NEEDS YOU (2)
+  parked        specs/export-flag.md — blocked in build: [product] include timings?
+  question      [product] Q6 — restrict invitations to verified domains?
+
+DECIDED FOR YOU (2)
+  agent call    [product] [REVIEW] Q4 — 404 for non-members, from standards/security
+  plan decision D11 - expiry sweep runs in the existing job scheduler
+
+DEFERRED (1)
+  candidate     CANDIDATE-SPEC: audit export has no paging</div>
+    <p class="example-note">Example output</p>
+    <p>Mark a decision <code>[REVIEWED]</code> when you accept it and it drops out of the report. To overturn one, change it in the spec or plan and re-queue; the next iteration reads the new answer. A pattern of wrong calls becomes a rule in <code>standards/</code>, and every later spec follows it.</p>
+  </div>
+</section>
+
+<section aria-labelledby="lanes">
+  <h2 id="lanes">Lanes: specs in parallel</h2>
+  <div class="col"><p>One worktree runs one loop at a time. A lane is a sibling worktree on its own branch with its own queue and runner, so two or three independent specs build at once.</p></div>
+  <div class="pair">
+    <div>
+      <h3>When to open one</h3>
+      <p>Independent specs that touch different files; a machine with room for another agent and test run; and an environment the lane can have to itself: its own ports, databases and test accounts. Two or three lanes at most, the main worktree included, and never a lane of a lane.</p>
+    </div>
+    <div>
+      <h3>How to split</h3>
+      <p>By the files specs touch: backend in one lane, frontend in another. Specs that depend on each other stay in the same lane, in order. Specs that need the same scarce test environment share a lane too.</p>
+    </div>
+    <div>
+      <h3>When to merge back</h3>
+      <p>After each spec reaches <code>reviewed</code>, one lane at a time, with a person's approval. Stop both runners, merge, keep the main plan, merge the ledger row by row, verify, then bring every other lane up to date straight away.</p>
+    </div>
+    <div>
+      <h3>What to expect</h3>
+      <p>With a good split, merges conflict only on the plan and ledger files, and a checklist script walks through them. A lane left unmerged for a week drifts far enough that the merge becomes its own project.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="jira">
+  <h2 id="jira">Jira, if you use it</h2>
+  <div class="col"><p>Off by default; nothing mentions a tracker. Turned on, each spec is bound to an issue and the loops keep it current without per-iteration noise.</p></div>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>When</th><th>In Jira</th></tr></thead>
+      <tbody>
+        <tr><td>The spec is written</td><td>Issue created or bound; moves to ready for development</td></tr>
+        <tr><td>Building starts</td><td>Moves to in progress</td></tr>
+        <tr><td>The exit gate passes</td><td>Moves to review required, with each gate's result</td></tr>
+        <tr><td>Each review pass</td><td>A comment: fixes applied, items left for a person, findings deferred</td></tr>
+        <tr><td>An out-of-scope finding worth tracking</td><td>A new linked issue</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col"><p class="muted">The loops never close, delete, reassign or reprioritise issues. If Jira is unreachable they keep working, and commits are refused until the missed update is retried, so no ticket is silently left behind.</p></div>
+</section>
+
+<section aria-labelledby="adopt">
+  <h2 id="adopt">Adopting it</h2>
+  <div class="col"><p>Allow an hour for the first spec. Start with a small one, on a branch, in a sandbox.</p></div>
+  <ol class="steps col">
+    <li><div class="body">
+      <h3>Copy the kit into your repository</h3>
+      <p><code>ralph/</code>, <code>scripts/</code>, <code>.githooks/</code>, <code>.claude/</code>, <code>standards/</code>, <code>templates/</code>, <code>docs/</code>. Merge into folders you already have; the getting-started guide lists what to watch for.</p>
+    </div></li>
+    <li><div class="body">
+      <h3>Configure your commands and check the setup</h3>
+      <div class="cmd"><pre>cp templates/config.example.json ralph.config.json
+node scripts/install-hooks.mjs
+node scripts/ralph-doctor.mjs</pre><button type="button" data-copy>Copy</button></div>
+      <p class="muted">Set your test, lint, typecheck and build commands. A command left empty is reported "not configured", never green. The hook installer refuses to replace hooks you already have.</p>
+    </div></li>
+    <li><div class="body">
+      <h3>Write five rules in <code>standards/</code></h3>
+      <p>The five things you would otherwise repeat in every code review. The spec author, the builder and the review agent all read them; every rule written down is a finding the loop stops making.</p>
+    </div></li>
+    <li><div class="body">
+      <h3>Write a spec</h3>
+      <div class="cmd"><pre>/design "add a --verbose flag to the export command"</pre><button type="button" data-copy>Copy</button></div>
+      <p class="muted">An interview, codebase research, seven mandatory questions (events, permissions, external exposure, flags, agent behaviour, UI states, migration), then a spec with acceptance tests per phase.</p>
+    </div></li>
+    <li><div class="body">
+      <h3>Run the loops by hand once</h3>
+      <div class="cmd"><pre>./ralph/loop.sh plan   1  specs/my-spec.md
+./ralph/loop.sh build  20 specs/my-spec.md
+./ralph/loop.sh review 5  specs/my-spec.md</pre><button type="button" data-copy>Copy</button></div>
+    </div></li>
+    <li><div class="body">
+      <h3>Then queue a few and walk away</h3>
+      <p>In Claude Code: "work autonomously through specs/a.md and specs/b.md". Keep the queue to about five specs; a long queue starts more work than it finishes.</p>
+    </div></li>
+  </ol>
+</section>
+
+<section aria-labelledby="safety">
+  <div class="warnbox col">
+    <h3 id="safety">Before the first overnight run</h3>
+    <p>Unattended runs skip permission prompts: the agent can run any command with your user's rights. The prompts forbid force pushes, infrastructure changes and signing approvals, but those are instructions, not a sandbox.</p>
+    <ul>
+      <li>Run it in a container, VM or throwaway worktree with no production credentials or deploy tooling.</li>
+      <li>Work on a branch; keep the pull request a draft so each push does not run your full CI.</li>
+      <li>Tag a checkpoint first, so undoing the whole run is one <code>git reset</code>.</li>
+      <li>Check your <code>CLAUDE.md</code> for rules like "ask before committing" that contradict an unattended loop.</li>
+    </ul>
+  </div>
+</section>
+
+<section aria-labelledby="lessons">
+  <h2 id="lessons">Each rule is there because something went wrong</h2>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Rule in the kit</th><th>What happened without it</th></tr></thead>
+      <tbody>
+        <tr><td>The queue runner is detached and keeps the machine awake</td><td>A process reaped under memory pressure at 23:23 lost eight hours of overnight work.</td></tr>
+        <tr><td>Review is capped, then audited for scope</td><td>One spec went through 34 review passes over eight days, each fixing what the last one introduced.</td></tr>
+        <tr><td>Verify a park reason against primary evidence</td><td>Loops diagnosed a wedged dependency as a warm-up race, then as throttling, for eight hours.</td></tr>
+        <tr><td>Keep the queue to about five specs</td><td>Seventeen large specs queued at once produced hundreds of commits and only three reviewed specs.</td></tr>
+        <tr><td>Every background process starts through one process owner</td><td>More than 60 orphaned headless browsers on one machine in a day.</td></tr>
+        <tr><td>A missing check is "not configured", never "pass"</td><td>A hook tested for exit code 1 only, so a command that was not found passed.</td></tr>
+        <tr><td>Draft pull requests while loops push</td><td>Every slice pushed to a ready PR ran the full CI suite, almost all of it against work in progress.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="docs">
+  <h2 id="docs">In the repository</h2>
+  <p class="col"><a href="https://github.com/centerMikeHicks/ralph-autonomous">github.com/centerMikeHicks/ralph-autonomous</a></p>
+  <div class="docs">
+    <div><span class="mono">README.md</span><span class="muted">The overview, with diagrams</span></div>
+    <div><span class="mono">GETTING_STARTED.md</span><span class="muted">Empty checkout to shipped spec</span></div>
+    <div><span class="mono">docs/DECISIONS.md</span><span class="muted">Decision rights, scope rules, review</span></div>
+    <div><span class="mono">docs/LANES.md</span><span class="muted">Parallel specs, split and merge</span></div>
+    <div><span class="mono">docs/ARCHITECTURE.md</span><span class="muted">Each piece and the failure it guards</span></div>
+    <div><span class="mono">examples/specs/</span><span class="muted">A spec at realistic size</span></div>
+  </div>
+</section>
+
+<footer>
+  <p>Requires Claude Code, Node.js 20+ and git. Other agent CLIs can be configured but lose telemetry and usage-limit recovery.</p>
+  <p>The Ralph loop technique is Geoffrey Huntley's (ghuntley.com/ralph). The kit is by Mike Hicks, MIT licensed.</p>
+</footer>
+
+</div>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var pre = btn.parentElement.querySelector('pre');
+    var text = pre.textContent;
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+    var fallback = function () {
+      var r = document.createRange(); r.selectNodeContents(pre);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = 'Selected';
+      setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
+  });
+});
+</script>
+</body>
+</html>

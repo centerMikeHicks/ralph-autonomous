@@ -232,7 +232,7 @@ scripts/
 standards/                   how to write your rules corpus, with one example rule
 templates/                   spec, ledger, queue, config (with every key explained)
 examples/                    a spec at realistic size
-docs/                        ARCHITECTURE, DECISIONS, LANES, RUNTIME, DRIVERS, SKILLS
+docs/                        overview.html, ARCHITECTURE, DECISIONS, LANES, RUNTIME, DRIVERS, SKILLS
 test/                        node:test suites and a small worked example project
 ```
 
@@ -240,6 +240,7 @@ test/                        node:test suites and a small worked example project
 
 | Read | When |
 |------|------|
+| [docs/overview.html](docs/overview.html) | A one-page visual overview for sharing (GitHub shows its source; open it in a browser after cloning or downloading) |
 | [GETTING_STARTED.md](GETTING_STARTED.md) | Setting it up and running your first spec |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Who decides what, the scope rules, where decisions are recorded, how to review and overturn them |
 | [docs/LANES.md](docs/LANES.md) | Running specs in parallel: when, how to split, environment isolation, merging back |
