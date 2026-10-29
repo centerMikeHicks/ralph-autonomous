@@ -143,7 +143,7 @@ exit with no status. `api_s` is model time, `tool_s` the rest of the run, `overh
 
 `USAGE_LOG.md`: the same facts as a markdown table. `loop-events.jsonl` rows are
 `{ts, run, event, ...}` with events `loop_start`, `iteration_start`, `iteration_end`, `push`,
-`usage_limit_wait`, `loop_stop` (`reason`: completed, max_iterations, blocked, stalled, signal).
+`usage_limit_wait`, `budget` (the caps in force and today's spend), `spend` (after each iteration: its cost, the run's and today's), `budget_stop`, `loop_stop` (`reason`: completed, max_iterations, blocked, stalled, signal, budget_run, budget_day, kill_switch).
 `.loop-heartbeat` holds `{run, iter, pid, ts}`, rewritten at each iteration start and every 30 s,
 and deleted at stop; a heartbeat older than two minutes means the run died.
 
@@ -169,6 +169,8 @@ the tracker block. With another agent command the probe is skipped with a warnin
 
 | Name | Effect |
 |---|---|
+| `RALPH_BUDGET_ITERATION_USD`, `RALPH_BUDGET_RUN_USD`, `RALPH_BUDGET_DAY_USD` | Override `budget.*` (an empty value unsets one); see `templates/config.example.md`, "budget". |
+| `RALPH_KILL_SWITCH` | The kill switch file, instead of `<stateDir>/STOP`: while it exists, no iteration starts. |
 | `RALPH_MODEL` | Force one model for every iteration (`--model` wins). |
 | `RALPH_AGENT_CMD` | Replace `agent.command`; used by the tests. |
 | `RALPH_SUPERVISED=1` | Ask before each iteration (needs a terminal; otherwise unattended). |

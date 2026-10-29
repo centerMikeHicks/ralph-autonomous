@@ -26,6 +26,7 @@ import {
   writeHeartbeat, writeIterationRecord,
 } from './telemetry.mjs';
 import { buildAgentArgs, buildAgentEnv, renderEvent, resolveAgent, resolveExecutable, spawnAgent } from './agent.mjs';
+import { anyCap, budgetDecision, budgetSettings, killSwitchOn, killSwitchPath, spentOn, today } from './budget.mjs';
 import { statusReport } from './status.mjs';
 
 const MODES = ['plan', 'build', 'review', 'status'];
@@ -247,6 +248,14 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK']) process.on(sig, onSignal);
 
   emit('loop_start', { mode, spec: specName, max_iterations: max, branch, pid: process.pid, supervised });
+  /* Spend (budget.mjs): this run's, and today's across runs, from the iterations already recorded. */
+  const budget = budgetSettings(cfg, env);
+  let runSpent = 0;
+  let spendDay = today();
+  let daySpent = spentOn(readJsonl(path.join(stateDir, 'iterations.jsonl')), spendDay);
+  emit('budget', { ...budget, day_usd: daySpent });
+  if (!anyCap(budget)) warn(`No spend cap is set (budget in ralph.config.json): watch this run. Today so far: $${daySpent.toFixed(2)}.`);
+  else info(`Spend caps: iteration ${budget.iterationUsd ?? '—'}, run ${budget.runUsd ?? '—'}, day ${budget.dayUsd ?? '—'} USD. Today so far: $${daySpent.toFixed(2)}.`);
   beat(0);
   if (fs.existsSync(sweepScript)) {
     spawnSync(process.execPath, [sweepScript, 'reap', '--stale', '--root', root], { stdio: 'inherit', shell: false });
@@ -258,6 +267,24 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         say('');
         warn(`Reached max iterations: ${max}`);
         stopReason = 'max_iterations';
+        break;
+      }
+      if (killSwitchOn(stateDir, env)) {
+        say('');
+        warn(`KILL SWITCH - ${killSwitchPath(stateDir, env)} exists; no iteration starts while it does. Remove it to run again.`);
+        stopReason = 'kill_switch';
+        break;
+      }
+      if (today() !== spendDay) {
+        spendDay = today();
+        daySpent = spentOn(readJsonl(path.join(stateDir, 'iterations.jsonl')), spendDay);
+      }
+      const spend = budgetDecision({ settings: budget, runSpent, daySpent });
+      if (spend.stop) {
+        say('');
+        warn(`SPEND CAP - ${spend.message} Stopping before iteration ${iter + 1}.`);
+        emit('budget_stop', { reason: spend.stop, run_usd: runSpent, day_usd: daySpent });
+        stopReason = spend.stop;
         break;
       }
       // A detached check an earlier iteration left running is waited for here, in the shell
@@ -341,7 +368,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       beat(iter);
       const timer = setInterval(() => beat(iter), 30000);
 
-      const args = buildAgentArgs({ agent, cfg, model: sel.model, effort: sel.effort, root });
+      const args = buildAgentArgs({ agent, cfg, model: sel.model, effort: sel.effort, root, budgetUsd: budget.iterationUsd });
       const handle = spawnAgent({
         root, agent, args, env: buildAgentEnv(agent, env), prompt,
         onLine: (line) => {
@@ -400,6 +427,10 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       if (row.result) info(`result: ${row.result.slice(0, 200)}`);
       if (row.next) info(`next:   ${row.next.slice(0, 200)}`);
       info(`time:   wall ${row.dur_s}s = model ${row.api_s}s + tools ${row.tool_s}s + overhead ${row.overhead_s}s | idle ${Math.round(row.gap_s)}s | ${row.turns} turns / ${row.tool_calls} tools`);
+      runSpent = Math.round((runSpent + (Number(row.cost_usd) || 0)) * 10000) / 10000;
+      daySpent = Math.round((daySpent + (Number(row.cost_usd) || 0)) * 10000) / 10000;
+      emit('spend', { iter, iteration_usd: row.cost_usd, run_usd: runSpent, day_usd: daySpent });
+      (anyCap(budget) ? info : warn)(`spend:  $${(Number(row.cost_usd) || 0).toFixed(4)} this iteration, $${runSpent.toFixed(2)} this run, $${daySpent.toFixed(2)} today${anyCap(budget) ? '' : ' (no cap set: watch this run)'}`);
 
       const decision = ejectDecision({
         outcome: row.outcome, fingerprintBefore: fpBefore, fingerprintAfter: fpAfter, headBefore, headAfter, stalled,

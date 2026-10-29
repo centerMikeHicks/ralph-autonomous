@@ -54,6 +54,8 @@ export const DEFAULTS = Object.freeze({
   sweep: { timeoutMin: 180, stallMin: 20, ownerProcessNames: ['claude'] },
   review: { scopeAuditAfterPasses: 5 },
   drift: { warnCommits: 50 },
+  // Spend caps in USD (ralph/lib/budget.mjs); null until the project knows what a run costs.
+  budget: { iterationUsd: null, runUsd: null, dayUsd: null },
 });
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -74,6 +76,7 @@ const T = {
   nonEmptyString: (v) => typeof v === 'string' && v.length > 0,
   boolean: (v) => typeof v === 'boolean',
   number: (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0,
+  usdOrNull: (v) => v === null || (typeof v === 'number' && Number.isFinite(v) && v > 0),
   stringArray: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   command: (v) => v === null || (typeof v === 'string' && v.trim() !== '') || (Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === 'string')),
 };
@@ -111,9 +114,12 @@ const RULES = [
   ['sweep.ownerProcessNames', T.stringArray, 'an array of process names'],
   ['review.scopeAuditAfterPasses', T.number, 'a non-negative number'],
   ['drift.warnCommits', T.number, 'a non-negative number'],
+  ['budget.iterationUsd', T.usdOrNull, 'null or a positive number of USD'],
+  ['budget.runUsd', T.usdOrNull, 'null or a positive number of USD'],
+  ['budget.dayUsd', T.usdOrNull, 'null or a positive number of USD'],
 ];
 
-const SECTIONS = ['project', 'agent', 'models', 'commands', 'tests', 'gates', 'tracker', 'queue', 'sweep', 'review', 'drift'];
+const SECTIONS = ['project', 'agent', 'models', 'commands', 'tests', 'gates', 'tracker', 'queue', 'sweep', 'review', 'drift', 'budget'];
 
 const getPath = (obj, dotted) => dotted.split('.').reduce((acc, k) => (isPlainObject(acc) ? acc[k] : undefined), obj);
 

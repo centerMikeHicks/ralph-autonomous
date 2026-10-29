@@ -44,14 +44,16 @@ export function resolveAgent(cfg, env = process.env) {
   return { command, baseArgs, isClaude, override: false };
 }
 
-/** argv for one iteration: configured args + model flag + effort flag (+ claude-only extras). */
-export function buildAgentArgs({ agent, cfg, model, effort, root }) {
+/** argv for one iteration: configured args + model flag + effort flag (+ claude-only extras, and the per-iteration budget). */
+export function buildAgentArgs({ agent, cfg, model, effort, root, budgetUsd = null }) {
   const a = cfg.agent || {};
   const args = [...agent.baseArgs];
   if (model && a.modelFlag) args.push(a.modelFlag, model);
   if (effort && a.effortFlag) args.push(a.effortFlag, effort);
   if (agent.isClaude) {
     args.push('--max-turns', String(a.maxTurns || 250));
+    // The CLI stops the iteration itself once it has spent this much (budget.iterationUsd).
+    if (budgetUsd) args.push('--max-budget-usd', String(budgetUsd));
     // Tools that only work interactively end a headless session instead of waiting.
     args.push('--disallowedTools', (a.disallowedTools || ['ScheduleWakeup', 'Monitor']).join(','));
     const mcp = path.join(root, '.mcp.json');

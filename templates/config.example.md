@@ -91,3 +91,15 @@ and no heartbeat), `ownerProcessNames` (process names that count as the agent se
 ## drift
 
 `warnCommits`: the pre-flight warns when the branch is this many commits behind `project.baseBranch`.
+
+## budget
+
+What the loop may spend, in USD (`ralph/lib/budget.mjs`). Each is `null` (no cap) by default. Set them once you know what a run costs. Until then, the driver warns at the start and reports the spend after every iteration, so the person watching the run sees it.
+
+- `iterationUsd`: passed to the `claude` CLI as `--max-budget-usd`, so one iteration stops itself there.
+- `runUsd`: the loop stops before an iteration once this run has spent this much.
+- `dayUsd`: the loop stops before an iteration once today (UTC) has spent this much, across runs. Today's spend is read from `.ralph/iterations.jsonl`.
+
+`RALPH_BUDGET_ITERATION_USD`, `RALPH_BUDGET_RUN_USD` and `RALPH_BUDGET_DAY_USD` override them; an empty value unsets one. A run stopped by a cap ends with `loop_stop` reason `budget_run` or `budget_day`.
+
+The kill switch: while `<stateDir>/STOP` exists (or the file `RALPH_KILL_SWITCH` names), no iteration starts, in any run. The run ends with reason `kill_switch`.

@@ -56,5 +56,6 @@
   "queue": { "buildChunk": 3, "maxBuild": 40, "maxReview": 8, "minFreeGb": 4, "maxRetries": 3, "watchTimeoutMin": 45 },
   "sweep": { "timeoutMin": 180, "stallMin": 20, "ownerProcessNames": ["claude"] },
   "review": { "scopeAuditAfterPasses": 5 },
-  "drift": { "warnCommits": 50 }
+  "drift": { "warnCommits": 50 },
+  "budget": { "iterationUsd": null, "runUsd": null, "dayUsd": null }
 }
