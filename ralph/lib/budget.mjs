@@ -8,6 +8,9 @@
 // driver says so at the start and reports the spend after every iteration, so a person watching sees it.
 // RALPH_BUDGET_ITERATION_USD, RALPH_BUDGET_RUN_USD and RALPH_BUDGET_DAY_USD override the file (an empty value unsets).
 //
+// Today's spend comes from RALPH_SPEND_LOG when it is set (a JSON-lines file of { ts, cost_usd } that outlives the
+// state directory, as a container's fresh clone needs), else from the state directory's iterations.jsonl.
+//
 // The kill switch: while <stateDir>/STOP (or RALPH_KILL_SWITCH) exists, no iteration starts, in any run.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,6 +52,16 @@ export function budgetDecision({ settings, runSpent, daySpent }) {
     return { stop: 'budget_day', message: `Today has spent $${daySpent.toFixed(2)}, at or over the daily cap of $${settings.dayUsd.toFixed(2)} (budget.dayUsd).` };
   }
   return { stop: null, message: null };
+}
+
+/** The file today's spend is read from: RALPH_SPEND_LOG, else <stateDir>/iterations.jsonl. */
+export const spendLogPath = (stateDir, env = process.env) => env.RALPH_SPEND_LOG || path.join(stateDir, 'iterations.jsonl');
+
+/** Adds one iteration's cost to RALPH_SPEND_LOG, when it is set (iterations.jsonl is written by the driver anyway). */
+export function recordSpend(env, entry) {
+  if (!env.RALPH_SPEND_LOG) return;
+  fs.mkdirSync(path.dirname(env.RALPH_SPEND_LOG), { recursive: true });
+  fs.appendFileSync(env.RALPH_SPEND_LOG, `${JSON.stringify(entry)}\n`);
 }
 
 /** The kill switch's path. */

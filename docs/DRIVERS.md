@@ -170,6 +170,7 @@ the tracker block. With another agent command the probe is skipped with a warnin
 | Name | Effect |
 |---|---|
 | `RALPH_BUDGET_ITERATION_USD`, `RALPH_BUDGET_RUN_USD`, `RALPH_BUDGET_DAY_USD` | Override `budget.*` (an empty value unsets one); see `templates/config.example.md`, "budget". |
+| `RALPH_SPEND_LOG` | A JSON-lines file, outside the state directory, that today's spend is read from and each iteration's cost added to, so `budget.dayUsd` holds across fresh clones. |
 | `RALPH_KILL_SWITCH` | The kill switch file, instead of `<stateDir>/STOP`: while it exists, no iteration starts. |
 | `RALPH_MODEL` | Force one model for every iteration (`--model` wins). |
 | `RALPH_AGENT_CMD` | Replace `agent.command`; used by the tests. |

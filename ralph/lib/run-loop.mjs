@@ -26,7 +26,7 @@ import {
   writeHeartbeat, writeIterationRecord,
 } from './telemetry.mjs';
 import { buildAgentArgs, buildAgentEnv, renderEvent, resolveAgent, resolveExecutable, spawnAgent } from './agent.mjs';
-import { anyCap, budgetDecision, budgetSettings, killSwitchOn, killSwitchPath, spentOn, today } from './budget.mjs';
+import { anyCap, budgetDecision, budgetSettings, killSwitchOn, killSwitchPath, recordSpend, spendLogPath, spentOn, today } from './budget.mjs';
 import { statusReport } from './status.mjs';
 
 const MODES = ['plan', 'build', 'review', 'status'];
@@ -252,7 +252,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const budget = budgetSettings(cfg, env);
   let runSpent = 0;
   let spendDay = today();
-  let daySpent = spentOn(readJsonl(path.join(stateDir, 'iterations.jsonl')), spendDay);
+  let daySpent = spentOn(readJsonl(spendLogPath(stateDir, env)), spendDay);
   emit('budget', { ...budget, day_usd: daySpent });
   if (!anyCap(budget)) warn(`No spend cap is set (budget in ralph.config.json): watch this run. Today so far: $${daySpent.toFixed(2)}.`);
   else info(`Spend caps: iteration ${budget.iterationUsd ?? '—'}, run ${budget.runUsd ?? '—'}, day ${budget.dayUsd ?? '—'} USD. Today so far: $${daySpent.toFixed(2)}.`);
@@ -277,7 +277,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       }
       if (today() !== spendDay) {
         spendDay = today();
-        daySpent = spentOn(readJsonl(path.join(stateDir, 'iterations.jsonl')), spendDay);
+        daySpent = spentOn(readJsonl(spendLogPath(stateDir, env)), spendDay);
       }
       const spend = budgetDecision({ settings: budget, runSpent, daySpent });
       if (spend.stop) {
@@ -430,6 +430,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       runSpent = Math.round((runSpent + (Number(row.cost_usd) || 0)) * 10000) / 10000;
       daySpent = Math.round((daySpent + (Number(row.cost_usd) || 0)) * 10000) / 10000;
       emit('spend', { iter, iteration_usd: row.cost_usd, run_usd: runSpent, day_usd: daySpent });
+      recordSpend(env, { ts: row.ts, cost_usd: row.cost_usd, run: row.run, spec: row.spec, branch: row.branch });
       (anyCap(budget) ? info : warn)(`spend:  $${(Number(row.cost_usd) || 0).toFixed(4)} this iteration, $${runSpent.toFixed(2)} this run, $${daySpent.toFixed(2)} today${anyCap(budget) ? '' : ' (no cap set: watch this run)'}`);
 
       const decision = ejectDecision({

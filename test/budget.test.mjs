@@ -120,6 +120,22 @@ test("today's spend across runs stops a run before it starts", () => {
   }
 });
 
+test('a spend log outside the state directory carries today across fresh clones', () => {
+  const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ralph-spend-')), 'spend.jsonl');
+  const first = project();
+  const second = project();
+  try {
+    const a = run(first, { RALPH_SPEND_LOG: log, RALPH_BUDGET_RUN_USD: '0.02' });
+    assert.equal(a.rows.length, 2, a.out);
+    assert.equal(readJsonl(log).length, 2);
+    const b = run(second, { RALPH_SPEND_LOG: log, RALPH_BUDGET_DAY_USD: '0.02' });
+    assert.equal(b.rows.length, 0, 'the second clone has no rows of its own, and today is already at the cap');
+    assert.equal(stopOf(b.events), 'budget_day');
+  } finally {
+    for (const d of [first, second, path.dirname(log)]) fs.rmSync(d, { recursive: true, force: true });
+  }
+});
+
 test('the kill switch stops every start while it is there', () => {
   const dir = project();
   try {

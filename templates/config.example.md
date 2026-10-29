@@ -98,7 +98,7 @@ What the loop may spend, in USD (`ralph/lib/budget.mjs`). Each is `null` (no cap
 
 - `iterationUsd`: passed to the `claude` CLI as `--max-budget-usd`, so one iteration stops itself there.
 - `runUsd`: the loop stops before an iteration once this run has spent this much.
-- `dayUsd`: the loop stops before an iteration once today (UTC) has spent this much, across runs. Today's spend is read from `.ralph/iterations.jsonl`.
+- `dayUsd`: the loop stops before an iteration once today (UTC) has spent this much, across runs. Today's spend is read from `.ralph/iterations.jsonl`, or from `RALPH_SPEND_LOG` when it is set: a file outside the state directory that each iteration's cost is added to, so the daily cap holds across runs that each start from a fresh clone (a container).
 
 `RALPH_BUDGET_ITERATION_USD`, `RALPH_BUDGET_RUN_USD` and `RALPH_BUDGET_DAY_USD` override them; an empty value unsets one. A run stopped by a cap ends with `loop_stop` reason `budget_run` or `budget_day`.
 
