@@ -51,7 +51,8 @@
       "site": "your-team.atlassian.net",
       "cloudId": null,
       "transitions": { "buildStarted": "In Progress", "exitGate": "Review Required", "designFinalized": "Ready For Development" }
-    }
+    },
+    "kairos": { "url": null }
   },
   "queue": { "buildChunk": 3, "maxBuild": 40, "maxReview": 8, "minFreeGb": 4, "maxRetries": 3, "watchTimeoutMin": 45 },
   "sweep": { "timeoutMin": 180, "stallMin": 20, "ownerProcessNames": ["claude"] },

@@ -86,8 +86,9 @@ Prompts are plain Markdown in `ralph/`; edit them in your repo like code. Keep t
 verifiers and driver rely on: the status JSON fields, the plan shape (`<- NEXT`, `Files:`, `Tests:`,
 Exit Gate last) and the ledger columns. Add project rules as files under `standards/` rather than by
 growing the prompts; the prompts already tell the agent to read them. To change which checks run, edit
-`ralph.config.json`. To use a tracker, set `tracker.provider` to `jira`; the driver then injects
-`ralph/TRACKER_jira.md` into each prompt, and with `none` no prompt mentions a tracker.
+`ralph.config.json`. To use a tracker, set `tracker.provider` to `jira` or `kairos`; the driver then injects
+`ralph/TRACKER_jira.md` or `ralph/TRACKER_kairos.md` into each prompt, and with `none` no prompt mentions a
+tracker.
 
 ## Quick start
 

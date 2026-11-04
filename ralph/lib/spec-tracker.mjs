@@ -57,13 +57,13 @@ export function resolveSpec({ root, stateDir, specArg }) {
 }
 
 /**
- * Tracker binding for the run. Only provider "jira" has one.
+ * Tracker binding for the run. Providers "jira" and "kairos" have one, by the spec's key.
  * @returns {{enabled:boolean, issue:string, project:string, error?:string, written?:boolean}}
  */
 export function resolveTracker({ cfg, root, spec, issueArg, skip }) {
   const t = cfg.tracker || {};
-  if (t.provider !== 'jira' || skip) return { enabled: false, issue: '', project: '' };
-  const project = (t.jira && t.jira.project) || '';
+  if ((t.provider !== 'jira' && t.provider !== 'kairos') || skip) return { enabled: false, issue: '', project: '' };
+  const project = t.provider === 'jira' ? (t.jira && t.jira.project) || '' : '';
   if (!spec) return { enabled: true, issue: issueArg || '', project };
   const file = path.resolve(root, spec);
   const text = readText(file);

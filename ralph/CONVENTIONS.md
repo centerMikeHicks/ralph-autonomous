@@ -154,6 +154,8 @@ Tooling fixes use `<KEY> Tooling: <summary>`. Stage by path; never `git add -A`.
 | `shipped` | **a person** | PR merged / released | a person closes the issue |
 | `paused`, `superseded` | a person or `/design` | explicit | none |
 
+With provider `kairos` the driver reports these itself and the agent does nothing (`ralph/TRACKER_kairos.md`).
+
 The first build iteration transitions to `buildStarted` ("In Progress"). Status names are resolved at call
 time; ids are never hard-coded. Only the Exit Gate flips `built`; only a clean review flips `reviewed`;
 the row stays in the Active table until a person ships it.

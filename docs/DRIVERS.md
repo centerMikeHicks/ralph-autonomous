@@ -27,6 +27,7 @@ last iteration and the head of the plan.
 | `telemetry.mjs` | Transcript metrics, `iterations.jsonl` row, `USAGE_LOG.md` row, `loop-events.jsonl`, heartbeat. |
 | `prompt-assemble.mjs` | Context blocks and prompt assembly; diff-anchor parsing. |
 | `spec-tracker.mjs` | Spec resolution, tracker binding in the spec front matter, plan bootstrap and archive. |
+| `kairos.mjs` | The Kairos tracker: asking whether the run may go on, and reporting what it did. |
 | `agent.mjs` | Resolves and spawns the agent CLI; renders stream events for the console. |
 | `status.mjs`, `fsutil.mjs`, `load-config.mjs` | `status` text; BOM/CRLF-tolerant file helpers; config via `scripts/lib/config.mjs` with a built-in fallback. |
 
@@ -70,8 +71,9 @@ Blocks are joined with `---` separators, in this order, and `PROMPT_<mode>.md` f
    from `git diff --unified=0 head_before head_after` of the newest such row for this spec.
 5. **Previous hand-off**: the last `ITERATION_STATUS.json`, marked STALE when it is older than the
    spec selection or names a different spec.
-6. **Tracker block**, only when `tracker.provider = "jira"` and not `--skip-tracker`: ticket key,
-   project, the coordination file `.ralph/tracker/<spec>.json`, then `ralph/TRACKER_jira.md`.
+6. **Tracker block**, only when `tracker.provider` is `jira` or `kairos` and not `--skip-tracker`. For
+   `jira`: ticket key, project, the coordination file `.ralph/tracker/<spec>.json`, then
+   `ralph/TRACKER_jira.md`. For `kairos`: the key, `ralph/TRACKER_kairos.md`, and what a person has answered.
    With provider `none` nothing mentions a tracker.
 7. **Last verification verdict**: the phase-tick check result of the previous build iteration and the
    previous `exit_gate` value.
@@ -164,6 +166,24 @@ With `tracker.provider = "jira"` the spec needs `tracker_issue: KEY` in its fron
 refuses to start when the Atlassian server is not connected, because every tracker step in the prompts
 is non-blocking and would otherwise be dropped silently. `--skip-tracker` prints a warning and omits
 the tracker block. With another agent command the probe is skipped with a warning.
+
+With `tracker.provider = "kairos"` the spec needs `tracker_issue` the same way, and the driver, not the agent,
+talks to Kairos. It needs `KAIROS_URL` (or `tracker.kairos.url`) and `KAIROS_RUN_TOKEN`, a key for that one item
+made by a person on its Build tab. The key is not passed to the agent's process.
+
+- **Before each iteration** it asks whether the run may go on. A stop, a pause, the item's cap, an unanswered
+  question, a stage not yet reached, or, for a build, a decision or validation row before Build each end the run
+  (`kairos_stop`, or `budget_item` at the cap). The caps in force are the lower of this repository's and Kairos's,
+  and an iteration may spend no more than the item has left.
+- **If Kairos cannot be read:** the run refuses to start. Once going, the last answer stands through a failed read,
+  and three in a row end the run (`kairos_unreachable`), so a stop placed there holds within a few steps.
+- **It reports** `run_started`, `plan_started`, `build_started`, each iteration's spend, `review_required`,
+  `review_run` and `run_ended`. Reporting never blocks the work: what could not be sent goes with the next report.
+- **`blocked`** puts the iteration's `next`, with the plan's open questions, in the owner's queue in Kairos. Later
+  runs refuse to start until it is answered, then read the answer in their prompt.
+- **`--skip-tracker`** runs without any of this, with a warning.
+- **`RALPH_TRACKER_PROVIDER`** overrides `tracker.provider` for a run. The config is on the branch, which the agent
+  can edit, so whoever starts the loop from outside the branch sets this to keep it under the tracker's control.
 
 ## Environment variables and flags
 

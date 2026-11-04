@@ -47,7 +47,7 @@ function block(title, body) {
  * @param {string} p.promptText contents of PROMPT_<mode>.md
  * @param {object|null} p.prevStatus previous ITERATION_STATUS.json (parsed) with {stale}
  * @param {string[]} p.anchors "path:lines" strings from the previous iteration
- * @param {{enabled:boolean, issue:string, project:string, state:string, text:string}|null} p.tracker
+ * @param {{enabled:boolean, issue:string, project:string, state?:string, text:string, answers?:string}|null} p.tracker
  * @param {{ticks?:string, exitGate?:string}|null} p.gate last verification verdict
  * @param {string} p.preflightFailure text of a pending failure note ('' when none)
  */
@@ -84,10 +84,11 @@ export function assemblePrompt(p) {
     const head = [
       `This loop run is bound to tracker ticket **${t.issue}**${t.project ? ` (project: ${t.project})` : ''}.`,
       '',
-      `- Coordination state file (read + update each iteration): \`${t.state}\``,
+      ...(t.state ? [`- Coordination state file (read + update each iteration): \`${t.state}\``] : []),
       `- Current loop mode: \`${p.mode}\``,
     ].join('\n');
     out += block('Tracker Ticket', `${head}\n\n${t.text || ''}`);
+    if (t.answers) out += block('A person answered (their decisions)', t.answers);
   }
   if (p.gate && (p.gate.ticks || p.gate.exitGate)) {
     const parts = [];

@@ -39,11 +39,23 @@ Input: $ARGUMENTS
 | `--type Story\|Task\|Bug\|Epic` | Override the issue type guessed from the description (tracker only). |
 | nothing | Ask what the user wants to build. |
 
-## Step 0: Tracker binding (only when `tracker.provider` is `jira` in `ralph.config.json`)
+## Step 0: Tracker binding (only when `tracker.provider` is `jira` or `kairos` in `ralph.config.json`)
 
-Read `ralph.config.json`. If `tracker.provider` is not `jira`, **skip this entire step** and note that the
-spec will have no ticket (`tracker_issue` is omitted; commits use the spec name as their key). Otherwise
-follow `ralph/TRACKER_jira.md` for tools and failure handling; resolve transitions by **status name** with
+Read `ralph.config.json`. If `tracker.provider` is `none`, **skip this entire step** and note that the
+spec will have no ticket (`tracker_issue` is omitted; commits use the spec name as their key).
+
+**With `kairos`,** use Kairos's MCP tools. You act for the person who signed in.
+
+- **A key given, or `--bind KEY specs/file.md`.** Find the item with `list_experiments`, then read it with
+  `get_experiment`. Say its stage, route, outcomes and validation rows, and design within them. Hold the key
+  for Step 7. With `--bind`, write `tracker_issue: KEY` into the spec's front matter, then stop and tell the
+  user to run `./ralph/loop.sh plan 1 specs/<name>.md`.
+- **A description only.** Report it with `file_intake`: its kind, a summary, and the route you propose. A
+  person promotes it, which gives it its key. Ask them for the key; never invent one.
+- **Errors.** If any call fails, tell the user and ask: retry, continue without tracking (retrofit later with
+  `--bind`), or abort.
+
+**With `jira`,** follow `ralph/TRACKER_jira.md` for tools and failure handling; resolve transitions by **status name** with
 `getTransitionsForJiraIssue`, never by a remembered id.
 
 - **Case A, key given.** `getJiraIssue`; if its status is a backlog-like status, transition to the
@@ -307,6 +319,13 @@ issue). The driver reads `tracker_issue` to bind loop activity; without it, trac
 for this spec. Run Step 6c.
 
 ### Step 7.5: Tracker finalize (only when Step 0 bound an issue)
+
+**With `kairos`:** record the spec with `set_artifact` (kind `spec`, its path and commit, the outcomes it
+serves, and the role that reviews it), then `add_note` "Design finalized: specs/<name>.md, ready for
+`./ralph/loop.sh plan 1 specs/<name>.md`". Before a run can start, the item's owner sets what it may spend and
+makes a run key on its Build tab in Kairos. Tell them so. Then go to Step 8.
+
+**With `jira`:**
 
 1. Update the issue description to the spec's Problem Statement and Overview (not the full spec) ending
    with `Full spec: specs/<name>.md` (`editJiraIssue`); update the summary if the spec's title differs.

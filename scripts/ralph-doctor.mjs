@@ -103,6 +103,9 @@ export function diagnose(root, { env = process.env } = {}) {
     if (!j.site && !j.cloudId) problems.push('neither tracker.jira.site nor tracker.jira.cloudId is set');
     for (const k of ['buildStarted', 'exitGate', 'designFinalized']) if (!j.transitions?.[k]) problems.push(`tracker.jira.transitions.${k} is empty`);
     add('tracker config', problems.length ? 'fail' : 'pass', problems.length ? problems.join('; ') : `jira project ${j.project}`);
+  } else if (config.tracker.provider === 'kairos') {
+    const url = process.env.KAIROS_URL || config.tracker.kairos?.url;
+    add('tracker config', url ? 'pass' : 'fail', url ? `kairos at ${url}; each run needs KAIROS_RUN_TOKEN` : 'tracker.provider is "kairos" but neither KAIROS_URL nor tracker.kairos.url is set');
   } else add('tracker config', 'pass', 'tracker.provider = none');
 
   const dirs = [stateDir, path.join(root, '.claude-temp', 'ralph-queue')];

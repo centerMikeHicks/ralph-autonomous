@@ -65,6 +65,8 @@ export function buildAgentArgs({ agent, cfg, model, effort, root, budgetUsd = nu
 /** Environment for the agent process. Claude-only toggles are set only for the claude CLI. */
 export function buildAgentEnv(agent, env = process.env) {
   const out = { ...env };
+  // The driver talks to Kairos; the agent has no business holding its key.
+  delete out.KAIROS_RUN_TOKEN;
   if (agent.isClaude) {
     // A background task belongs to the iteration's process and dies with it; run foreground.
     out.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS ??= '1';

@@ -7,7 +7,7 @@
  * Errors always fail (exit 1); advisories fail only under --strict. Exit 2 = cannot run.
  * Every finding carries a rule id and a file:line.
  *
- *   front-matter      the spec opens with a `---` block; with tracker.provider "jira" it carries
+ *   front-matter      the spec opens with a `---` block; with tracker.provider "jira" or "kairos" it carries
  *                     `tracker_issue:`
  *   section           a required `##` section is missing
  *   phase-acceptance  a phase has no `**Acceptance Tests**` block, or the block holds no rows
@@ -97,7 +97,7 @@ export function findContradictions(text) {
 }
 
 /**
- * Lint a spec's text. `options.trackerProvider` ("none" | "jira") enables the tracker front-matter rule.
+ * Lint a spec's text. `options.trackerProvider` ("none" | "jira" | "kairos") enables the tracker front-matter rule.
  * @returns {{ spec, findings, errors, advisories }}
  */
 export function lintSpec(text, { specPath = 'spec.md', trackerProvider = 'none', strict = false } = {}) {
@@ -110,7 +110,7 @@ export function lintSpec(text, { specPath = 'spec.md', trackerProvider = 'none',
   // front-matter
   const fm = parseFrontMatter(text);
   if (!fm.present) add('front-matter', 'error', 1, fm.unterminated ? 'front matter opened with `---` is never closed' : 'the spec must open with a `---` front-matter block');
-  else if (trackerProvider === 'jira' && !fm.data.tracker_issue) add('front-matter', 'error', 1, 'tracker.provider is "jira" but the front matter has no `tracker_issue:`');
+  else if ((trackerProvider === 'jira' || trackerProvider === 'kairos') && !fm.data.tracker_issue) add('front-matter', 'error', 1, `tracker.provider is "${trackerProvider}" but the front matter has no \`tracker_issue:\``);
 
   // section
   for (const [name, re] of REQUIRED_SECTIONS) {

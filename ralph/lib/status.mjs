@@ -15,7 +15,7 @@ export function statusReport({ root, stateDir, cfg }) {
     const specFile = path.resolve(root, spec);
     if (fs.existsSync(specFile)) {
       out.push('Spec Status: Found');
-      if ((cfg.tracker || {}).provider === 'jira') {
+      if (['jira', 'kairos'].includes((cfg.tracker || {}).provider)) {
         const issue = frontMatterValue(readText(specFile), 'tracker_issue');
         out.push(issue ? `Tracker:     ${issue} (from spec front matter)` : 'Tracker:     (none - add tracker_issue or pass --issue)');
       }

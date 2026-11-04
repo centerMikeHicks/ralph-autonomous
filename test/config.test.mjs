@@ -60,7 +60,7 @@ test('invalid JSON and invalid types give clear errors naming the file and every
       assert.match(err.message, /invalid configuration/);
       assert.match(err.message, /"queue\.maxBuild" must be a non-negative number/);
       assert.match(err.message, /"commands\.test" must be null/);
-      assert.match(err.message, /"tracker\.provider" must be "none" or "jira"/);
+      assert.match(err.message, /"tracker\.provider" must be "none", "jira" or "kairos"/);
       assert.match(err.message, /"sweep" must be an object/);
       return true;
     });

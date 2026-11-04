@@ -26,6 +26,7 @@ import {
   writeHeartbeat, writeIterationRecord,
 } from './telemetry.mjs';
 import { buildAgentArgs, buildAgentEnv, renderEvent, resolveAgent, resolveExecutable, spawnAgent } from './agent.mjs';
+import { answersBlock, capsWithKairos, createKairos, kairosProblem, kairosSettings, MAX_FAILED_READS, productQuestions, stopReasonFor } from './kairos.mjs';
 import { anyCap, budgetDecision, budgetSettings, killSwitchOn, killSwitchPath, recordSpend, spendLogPath, spentOn, today } from './budget.mjs';
 import { statusReport } from './status.mjs';
 
@@ -177,16 +178,48 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     return 1;
   }
 
+  /* RALPH_TRACKER_PROVIDER is for whoever starts the loop from outside the branch: the config is on the branch, which the
+     agent can edit, so it cannot be what keeps a run under a tracker's control. */
+  if (env.RALPH_TRACKER_PROVIDER) cfg.tracker = { ...(cfg.tracker || {}), provider: env.RALPH_TRACKER_PROVIDER };
+  const trackerProvider = (cfg.tracker || {}).provider;
   const tracker = resolveTracker({ cfg, root, spec, issueArg: opts.issue, skip: opts.skipTracker });
-  if ((cfg.tracker || {}).provider === 'jira' && opts.skipTracker) {
-    warn('--skip-tracker set: skipping the tracker preflight and tracker prompt injection for this run.');
+  const provider = trackerProvider;
+  if ((provider === 'jira' || provider === 'kairos') && opts.skipTracker) {
+    warn(`--skip-tracker set: skipping the tracker preflight and tracker prompt injection for this run.${provider === 'kairos' ? ' Nothing in Kairos can stop or limit it, and it will not be on the record.' : ''}`);
   }
+  let kairos = null;
+  let controls = null;
   if (tracker.enabled) {
     if (tracker.error) {
       fail(tracker.error);
       return 1;
     }
-    if (agent.isClaude) {
+    if (provider === 'kairos') {
+      const settings = kairosSettings(cfg, env);
+      const problem = kairosProblem(settings);
+      if (problem) {
+        fail(`Kairos: ${problem}.`);
+        info('Or pass --skip-tracker to run without Kairos on purpose.');
+        return 1;
+      }
+      if (!tracker.issue) {
+        fail("Kairos: this run has no item: name its spec, with tracker_issue in the spec's front matter or --issue KEY.");
+        return 1;
+      }
+      kairos = createKairos({ ...settings, item: tracker.issue, ...(env.RALPH_KAIROS_RETRY_MS ? { retryMs: Number(env.RALPH_KAIROS_RETRY_MS) } : {}), onLost: (_q, r) => warn(`Kairos refused a report: ${r.message}`) });
+      info(`Preflight: asking Kairos whether ${tracker.issue} may ${mode}...`);
+      const first = await kairos.controls(mode);
+      if (!first.ok) {
+        fail(`Kairos: ${first.message}. Not starting, since nothing there could stop or limit this run.`);
+        return 1;
+      }
+      if (!first.data.go) {
+        fail(`Kairos: ${first.data.why}`);
+        return 1;
+      }
+      controls = first.data;
+      info(`Preflight OK: ${controls.key ?? controls.item} is at ${controls.stage}; $${Number(controls.spentUsd).toFixed(2)} spent of ${controls.caps.itemUsd === null ? 'no cap' : `$${Number(controls.caps.itemUsd).toFixed(2)}`}.`);
+    } else if (agent.isClaude) {
       info('Preflight: checking tracker (Atlassian MCP) connectivity...');
       const exe = resolveExecutable(agent.command, env);
       const viaShell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(exe);
@@ -216,7 +249,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   say(`  Branch:     ${branch}`);
   say(`  Model:      ${describeStrategy({ mode, models: cfg.models, forced })}`);
   say(`  Run mode:   ${supervised ? 'supervised (confirm each iteration)' : 'unattended'}`);
-  if (tracker.enabled) say(`  Tracker:    ${tracker.issue} (${tracker.project})`);
+  if (tracker.enabled) say(`  Tracker:    ${tracker.issue}${tracker.project ? ` (${tracker.project})` : ''}${kairos ? ' on Kairos' : ''}`);
   if (max > 0) say(`  Max iters:  ${max}`);
   say(paint('36', '=============================================='));
 
@@ -249,8 +282,19 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
 
   emit('loop_start', { mode, spec: specName, max_iterations: max, branch, pid: process.pid, supervised });
   /* Spend (budget.mjs): this run's, and today's across runs, from the iterations already recorded. */
-  const budget = budgetSettings(cfg, env);
+  let budget = capsWithKairos(budgetSettings(cfg, env), controls?.caps);
   let runSpent = 0;
+  let commits = 0;
+  let failedReads = 0;
+  /* What Kairos hears. Reporting never holds up the work. */
+  const tell = async (event, fields = {}) => {
+    if (!kairos) return null;
+    const { sent, failed } = await kairos.report({ event, run, mode, spec, branch, iter, runUsd: runSpent, commits, ...fields });
+    if (failed) warn(`Kairos did not take a report, and it will be sent again: ${failed.message}`);
+    emit('kairos_report', { event, ok: !failed, ...(failed ? { error: failed.message } : {}) });
+    return sent;
+  };
+  await tell('run_started');
   let spendDay = today();
   let daySpent = spentOn(readJsonl(spendLogPath(stateDir, env)), spendDay);
   emit('budget', { ...budget, day_usd: daySpent });
@@ -274,6 +318,34 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         warn(`KILL SWITCH - ${killSwitchPath(stateDir, env)} exists; no iteration starts while it does. Remove it to run again.`);
         stopReason = 'kill_switch';
         break;
+      }
+      if (kairos) {
+        const read = await kairos.controls(mode);
+        if (read.ok) {
+          failedReads = 0;
+          controls = read.data;
+          budget = capsWithKairos(budgetSettings(cfg, env), controls.caps);
+          if (!controls.go) {
+            say('');
+            warn(`KAIROS - ${controls.why} Stopping before iteration ${iter + 1}.`);
+            stopReason = stopReasonFor(controls.code);
+            break;
+          }
+        } else if (!read.retry) {
+          say('');
+          warn(`KAIROS - ${read.message} Stopping before iteration ${iter + 1}.`);
+          stopReason = 'kairos_stop';
+          break;
+        } else {
+          failedReads += 1;
+          warn(`Kairos could not be read (${failedReads} of ${MAX_FAILED_READS}): ${read.message}`);
+          if (failedReads >= MAX_FAILED_READS) {
+            say('');
+            warn(`KAIROS - it has not answered ${MAX_FAILED_READS} times in a row, so a stop placed there would not be seen. Stopping.`);
+            stopReason = 'kairos_unreachable';
+            break;
+          }
+        }
       }
       if (today() !== spendDay) {
         spendDay = today();
@@ -300,6 +372,10 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         }
       }
       iter += 1;
+      if (iter === 1 && mode !== 'review') {
+        const said = await tell(`${mode}_started`);
+        if (mode === 'build' && said?.moved === false) warn(`Kairos keeps ${tracker.issue} at ${said.controls?.stage}: something holds it before Build.`);
+      }
 
       const planText = readText(planFile);
       const sel = selectModel({ mode, planText, models: cfg.models, forced });
@@ -329,13 +405,15 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       const anchors = lastCommit
         ? parseDiffAnchors(gitText(root, ['diff', '--unified=0', lastCommit.head_before, lastCommit.head_after]))
         : [];
-      const trackerBlock = tracker.enabled && tracker.issue
-        ? {
-            ...tracker,
-            state: `${path.relative(root, stateDir).replace(/\\/g, '/')}/tracker/${specName}.json`,
-            text: readText(path.join(root, 'ralph', 'TRACKER_jira.md')),
-          }
-        : null;
+      const trackerBlock = !tracker.enabled || !tracker.issue
+        ? null
+        : kairos
+          ? { ...tracker, text: readText(path.join(root, 'ralph', 'TRACKER_kairos.md')), answers: answersBlock(controls?.answers) }
+          : {
+              ...tracker,
+              state: `${path.relative(root, stateDir).replace(/\\/g, '/')}/tracker/${specName}.json`,
+              text: readText(path.join(root, 'ralph', 'TRACKER_jira.md')),
+            };
       const lastGate = readJson(lastGateFile, null);
       const gate = { ticks: lastGate?.ticks || '', exitGate: prev?.exit_gate ? String(prev.exit_gate) : '' };
       const prompt = assemblePrompt({
@@ -431,6 +509,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       daySpent = Math.round((daySpent + (Number(row.cost_usd) || 0)) * 10000) / 10000;
       emit('spend', { iter, iteration_usd: row.cost_usd, run_usd: runSpent, day_usd: daySpent });
       recordSpend(env, { ts: row.ts, cost_usd: row.cost_usd, run: row.run, spec: row.spec, branch: row.branch });
+      if (row.committed) commits += 1;
+      await tell(mode === 'review' ? 'review_run' : 'iteration', mode === 'review' ? { text: String(status.result || status.did || 'A review pass finished').slice(0, 500) } : {});
       (anyCap(budget) ? info : warn)(`spend:  $${(Number(row.cost_usd) || 0).toFixed(4)} this iteration, $${runSpent.toFixed(2)} this run, $${daySpent.toFixed(2)} today${anyCap(budget) ? '' : ' (no cap set: watch this run)'}`);
 
       const decision = ejectDecision({
@@ -480,12 +560,19 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         if (status.next) say(`  NEEDS:  ${status.next}`);
         say('  Resolve the above, then restart the loop.');
         stopReason = decision.stop;
+        if (decision.stop === 'blocked') {
+          /* The question goes to the owner's queue, with what they need to answer it, and later runs wait for it. */
+          const question = String(status.next || status.result || 'The build needs a person to decide something.').replace(/\s+/g, ' ').slice(0, 500);
+          const open = productQuestions(readText(planFile));
+          await tell('parked', { text: question, context: [status.result ? `**What it found:** ${status.result}` : '', open.length ? `**The plan's open questions:**\n${open.join('\n')}` : ''].filter(Boolean).join('\n\n').slice(0, 20000) });
+        }
         break;
       }
 
       const planNow = readText(planFile);
       if ((mode === 'build' && allPhasesDone(planNow)) || (mode === 'review' && /^passed$/i.test(status.exit_gate))) {
         info('Plan complete; stopping.');
+        if (mode === 'build') await tell('review_required');
         stopReason = 'completed';
         break;
       }
@@ -498,6 +585,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     if (interrupted) stopReason = 'signal';
   } finally {
     emit('loop_stop', { reason: stopReason, iterations: iter, wall_s: Math.round((Date.now() - loopStart) / 1000) });
+    await tell('run_ended', { stopReason });
+    if (kairos?.pending()) warn(`${kairos.pending()} report(s) to Kairos could not be sent. The run's record is still in Git.`);
     removeHeartbeat(stateDir);
     for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK']) process.removeListener(sig, onSignal);
   }

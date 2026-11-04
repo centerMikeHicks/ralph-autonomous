@@ -23,7 +23,7 @@ export const FALLBACK_DEFAULTS = {
   },
   commands: { test: null, lint: null, typecheck: null, build: null, affectedTest: null, format: null },
   gates: { exitGate: ['lint', 'typecheck', 'build', 'test'] },
-  tracker: { provider: 'none', jira: { project: 'PROJ', site: null, cloudId: null } },
+  tracker: { provider: 'none', jira: { project: 'PROJ', site: null, cloudId: null }, kairos: { url: null } },
   sweep: { timeoutMin: 180, stallMin: 20 },
 };
 

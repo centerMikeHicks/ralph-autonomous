@@ -50,7 +50,7 @@ const n = (Number(fs.existsSync(counterFile) ? fs.readFileSync(counterFile, 'utf
 fs.writeFileSync(counterFile, String(n));
 
 if (process.env.FAKE_AGENT_LOG) {
-  fs.appendFileSync(process.env.FAKE_AGENT_LOG, `${JSON.stringify({ n, args: process.argv.slice(2), prompt_bytes: prompt.length })}\n`);
+  fs.appendFileSync(process.env.FAKE_AGENT_LOG, `${JSON.stringify({ n, args: process.argv.slice(2), prompt_bytes: prompt.length, saw_run_token: Boolean(process.env.KAIROS_RUN_TOKEN) })}\n`);
 }
 if (process.env.FAKE_AGENT_PROMPT_DIR) {
   fs.mkdirSync(process.env.FAKE_AGENT_PROMPT_DIR, { recursive: true });

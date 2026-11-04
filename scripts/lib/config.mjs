@@ -47,6 +47,7 @@ export const DEFAULTS = Object.freeze({
       cloudId: null,
       transitions: { buildStarted: 'In Progress', exitGate: 'Review Required', designFinalized: 'Ready For Development' },
     },
+    kairos: { url: null },
   },
   queue: { buildChunk: 3, maxBuild: 40, maxReview: 8, minFreeGb: 4, maxRetries: 3, watchTimeoutMin: 45 },
   // ownerProcessNames: process names (without .exe) that count as an agent session when a
@@ -102,7 +103,7 @@ const RULES = [
   ['gates.baseHealth.checks', (v) => Array.isArray(v), 'an array'],
   ['gates.requireAcceptanceBindings', T.boolean, 'true or false'],
   ['gates.reviewSubagent', T.string, 'a string'],
-  ['tracker.provider', (v) => v === 'none' || v === 'jira', '"none" or "jira"'],
+  ['tracker.provider', (v) => v === 'none' || v === 'jira' || v === 'kairos', '"none", "jira" or "kairos"'],
   ['queue.buildChunk', T.number, 'a non-negative number'],
   ['queue.maxBuild', T.number, 'a non-negative number'],
   ['queue.maxReview', T.number, 'a non-negative number'],
