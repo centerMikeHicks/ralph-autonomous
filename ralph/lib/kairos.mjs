@@ -15,6 +15,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { splitTaskId } from './plan-parse.mjs';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const WORTH_RETRYING = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
@@ -151,7 +152,7 @@ const NEXT_MARK = /\s*(?:←|<-)\s*NEXT\b/;
 const TEST_ROW = /^`?\[(?:unit|integration|e2e|visual-only)\]/;
 
 /** A plan line's words, without its checkbox, emphasis, marker, model tag or commit, so a tick can be matched to its line. */
-const lineWords = (text) => String(text).replace(NEXT_MARK, '').replace(MODEL_TAG, '').replace(SHA_AT_END, '').replace(/\*\*/g, '').replace(SHA_AT_END, '').trim();
+const lineWords = (text) => splitTaskId(String(text).trimStart()).words.replace(NEXT_MARK, '').replace(MODEL_TAG, '').replace(SHA_AT_END, '').replace(/\*\*/g, '').replace(SHA_AT_END, '').trim();
 const phaseId = (title) => {
   const n = /^Phase\s+(\d+[a-z]?)\b/i.exec(title);
   if (n) return `phase-${n[1].toLowerCase()}`;
@@ -235,7 +236,7 @@ export function planForKairos(planText) {
     const tests = /^\s+Tests:\s*(.+)$/i.exec(raw);
     const files = /^\s+Files:\s*(.+)$/i.exec(raw);
     if (t && TEST_ROW.test(t[2].trim())) phase.tests.push(t[2].trim().slice(0, 1000));
-    else if (t && lineWords(t[2])) phase.tasks.push({ text: lineWords(t[2]).slice(0, 1000), done: t[1].toLowerCase() === 'x', commit: SHA_AT_END.exec(t[2])?.[1] ?? null });
+    else if (t && lineWords(t[2])) phase.tasks.push({ ...(splitTaskId(t[2].trimStart()).id ? { id: splitTaskId(t[2].trimStart()).id } : {}), text: lineWords(t[2]).slice(0, 1000), done: t[1].toLowerCase() === 'x', commit: SHA_AT_END.exec(t[2])?.[1] ?? null });
     else if (tests) phase.tests.push(tests[1].trim().slice(0, 1000));
     else if (files) phase.files.push(...filesIn(files[1]));
   }
@@ -271,18 +272,32 @@ export const isWorkFile = (file) => !/^(\.ralph|\.claude-temp|records|specs)\//.
 
 /** The plan Kairos holds, with what this copy and Kairos both know to be done ticked. So a person's words never lose a tick. */
 export function withTicks(markdown, localText, phases = []) {
-  const done = new Set();
+  const doneIds = new Set();
+  const doneWords = new Set();
+  const doneUnnumbered = new Set();
+  const note = (text, id = null) => {
+    const own = id ?? splitTaskId(String(text).trimStart()).id;
+    const words = lineWords(text);
+    doneWords.add(words);
+    if (own) doneIds.add(own);
+    else doneUnnumbered.add(words);
+  };
   for (const line of String(localText || '').split(/\r?\n/)) {
     const m = /^\s*- \[[xX]\] (.+)$/.exec(line);
-    if (m) done.add(lineWords(m[1]));
+    if (m) note(m[1]);
   }
   for (const p of phases) {
-    if (p.done) done.add(lineWords(p.title));
-    for (const t of p.tasks ?? []) if (t.done) done.add(lineWords(t.text));
+    if (p.done) note(p.title);
+    for (const t of p.tasks ?? []) if (t.done) note(t.text, t.id ?? null);
   }
   return String(markdown).split('\n').map((line) => {
     const m = /^(\s*- \[) (\] )(.+?)(\r?)$/.exec(line);
-    return m && done.has(lineWords(m[3])) ? `${m[1]}x${m[2]}${m[3]}${m[4]}` : line;
+    if (!m) return line;
+    const id = splitTaskId(m[3].trimStart()).id;
+    const words = lineWords(m[3]);
+    /* A line with an id is ticked by that id, or by a done task that has none; it is never ticked by another id's words. */
+    const ticked = id ? doneIds.has(id) || doneUnnumbered.has(words) : doneWords.has(words);
+    return ticked ? `${m[1]}x${m[2]}${m[3]}${m[4]}` : line;
   }).join('\n');
 }
 

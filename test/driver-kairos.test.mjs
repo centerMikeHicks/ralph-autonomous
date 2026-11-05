@@ -223,6 +223,39 @@ test('a person\'s version of the plan keeps the ticks this copy and Kairos know 
   assert.equal(out, '## Phases\n- [x] **Phase 1: The record**\n  - [x] Add the table\n  - [ ] Add a thing they added\n- [ ] **Phase 2: The screen** <- NEXT\n');
 });
 
+test('planForKairosSendsTaskIds', () => {
+  const { phases } = planForKairos('## Phases\n- [ ] **Phase 1: A** <- NEXT\n  - [ ] P1.T1 Add the list [sonnet]\n  - [x] EG.T2 Run the gate (abc1234)\n');
+  assert.deepEqual(phases[0].tasks, [{ id: 'P1.T1', text: 'Add the list', done: false, commit: null }, { id: 'EG.T2', text: 'Run the gate', done: true, commit: 'abc1234' }]);
+});
+
+test('planForKairosOmitsIdWhenNone', () => {
+  const { phases } = planForKairos('## Phases\n- [ ] **Phase 1: A**\n  - [ ] Add the list\n');
+  assert.equal('id' in phases[0].tasks[0], false);
+  assert.equal(phases[0].tasks[0].text, 'Add the list');
+});
+
+const ticks = (theirs, local, tasks = []) => withTicks(theirs, local, [{ title: 'Phase 1: A', done: false, tasks }]);
+
+test('rewordedTaskKeepsItsTick', () => {
+  const out = ticks('  - [ ] P1.T1 Add the whole list\n', '  - [x] P1.T1 Add the list (abc1234)\n');
+  assert.equal(out, '  - [x] P1.T1 Add the whole list\n');
+});
+
+test('kairosTaskIdTicksRewordedLine', () => {
+  const out = ticks('  - [ ] P1.T1 Add the whole list\n', '', [{ id: 'P1.T1', text: 'Add the list', done: true }]);
+  assert.equal(out, '  - [x] P1.T1 Add the whole list\n');
+});
+
+test('sameWordsUnderAnotherIdStayOpen', () => {
+  const out = ticks('  - [ ] P1.T2 Add the list\n', '  - [x] P1.T1 Add the list\n', [{ id: 'P1.T1', text: 'Add the list', done: true }]);
+  assert.equal(out, '  - [ ] P1.T2 Add the list\n');
+});
+
+test('unnumberedDoneTaskTicksLineWithId', () => {
+  const out = ticks('  - [ ] P1.T1 Add the list\n', '  - [x] Add the list\n');
+  assert.equal(out, '  - [x] P1.T1 Add the list\n');
+});
+
 // ---- the whole loop ---------------------------------------------------------------------------------------------------
 
 const PLAN = `# Implementation Plan
@@ -567,6 +600,37 @@ test('the plan goes to Kairos after each iteration, as checked, and a person\'s 
     assert.match(after, /a task they added/);
     assert.match(after, /- \[x\] task one/, 'the tick the run earned before survives');
     assert.match(r.prompt(1), /may do on its own: hands-off/);
+  } finally {
+    await k.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('personsRewordKeepsTickThroughTheLoop', { timeout: 60000 }, async () => {
+  const dir = project();
+  fs.writeFileSync(path.join(dir, '.ralph', 'IMPLEMENTATION_PLAN.md'), PLAN.replace('  - [ ] task one', '  - [ ] P1.T1 task one').replace('  - [ ] task two', '  - [ ] P1.T2 task two'));
+  let version = null;
+  let byPerson = false;
+  const theirs = '## Status: x\n## Active Spec\n`specs/demo.md`\n## Phases\n- [ ] **Phase 1: Demo** <- NEXT\n  - [ ] P1.T1 task one, said another way\n  - [ ] P1.T2 task two\n- [ ] **Exit Gate**\n';
+  const k = await standIn(
+    (n) => {
+      if (n >= 3) {
+        version = 2;
+        byPerson = true;
+      }
+      return { agency: 'hands-off', plan: { state: 'approved', version, comments: null } };
+    },
+    () => ({ version, markdown: theirs, phases: [], byPerson })
+  );
+  try {
+    const r = await loop(dir, ['build', '2', 'specs/demo.md'], { iterations: [commit(1), commit(2)] }, { KAIROS_URL: k.url });
+    assert.equal(r.code, 0, r.out);
+    const plans = k.seen.events.filter((e) => e.event === 'plan');
+    assert.deepEqual(plans[0].plan.phases[0].tasks.map((t) => [t.id, t.text, t.done]).slice(0, 1), [['P1.T1', 'task one', true]]);
+    const after = fs.readFileSync(path.join(dir, '.ralph', 'IMPLEMENTATION_PLAN.md'), 'utf8');
+    assert.match(after, /- \[x\] P1\.T1 task one, said another way/);
+    assert.equal(plans[1].plan.phases[0].tasks[0].id, 'P1.T1');
+    assert.equal(plans[1].plan.phases[0].tasks[0].text, 'task one, said another way');
   } finally {
     await k.close();
     fs.rmSync(dir, { recursive: true, force: true });
