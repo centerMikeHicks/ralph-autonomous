@@ -31,9 +31,21 @@ export function nextTask(planText) {
   return '';
 }
 
+/** A task's leading id: P<n>.T<m> (the phase number may carry a letter) or EG.T<m>, then a space or the end. */
+export const TASK_ID = /^(?:P\d+[a-z]?|EG)\.T\d+(?=\s|$)/;
+
+/** Split a task's text into its leading id (null when none) and the words after it. */
+export function splitTaskId(text) {
+  const t = text || '';
+  const m = TASK_ID.exec(t);
+  if (!m) return { id: null, words: t };
+  return { id: m[0], words: t.slice(m[0].length).trimStart() };
+}
+
 /** Mechanical when tagged [haiku]/[mechanical] or the text reads like a codemod/regeneration/doc pass. */
-export function isMechanicalTask(task) {
-  if (!task) return false;
+export function isMechanicalTask(taskText) {
+  if (!taskText) return false;
+  const task = splitTaskId(taskText).words;
   if (/\[(haiku|mechanical)\]/i.test(task)) return true;
   if (/\[sonnet\]/i.test(task)) return false;
   return MECHANICAL_RE.test(task);

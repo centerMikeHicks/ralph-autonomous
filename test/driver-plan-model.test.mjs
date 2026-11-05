@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isExitGateNext, nextTask, isMechanicalTask, allPhasesDone, planView, planActiveSpec } from '../ralph/lib/plan-parse.mjs';
+import { isExitGateNext, nextTask, isMechanicalTask, splitTaskId, allPhasesDone, planView, planActiveSpec } from '../ralph/lib/plan-parse.mjs';
 import { selectModel, describeStrategy } from '../ralph/lib/model-select.mjs';
 
 const models = {
@@ -123,4 +123,24 @@ test('a forced model wins everywhere and sends no effort', () => {
 test('describeStrategy mentions the tiers', () => {
   assert.match(describeStrategy({ mode: 'build', models }), /sonnet\/medium.*haiku\/low.*sonnet\/high/);
   assert.match(describeStrategy({ mode: 'plan', models, forced: 'x' }), /^x \(forced/);
+});
+
+test('splitTaskIdReadsLeadingId', () => {
+  assert.deepEqual(splitTaskId('P2.T3 Add the list [sonnet]'), { id: 'P2.T3', words: 'Add the list [sonnet]' });
+});
+
+test('splitTaskIdAcceptsExitGateAndLetteredPhases', () => {
+  assert.equal(splitTaskId('EG.T1 Run the gate').id, 'EG.T1');
+  assert.equal(splitTaskId('P1a.T2 Fix it').id, 'P1a.T2');
+});
+
+test('splitTaskIdIgnoresWhatIsNotAnId', () => {
+  for (const t of ['Phase 2 work', 'P2-T3 x', 'p2.t3 x', 'P2.T3x x', 'Add the list']) {
+    assert.deepEqual(splitTaskId(t), { id: null, words: t }, t);
+  }
+});
+
+test('mechanicalTaskSeenPastItsId', () => {
+  assert.equal(isMechanicalTask('P3.T1 regenerate the table'), true);
+  assert.equal(isMechanicalTask('P3.T2 Add the route [sonnet]'), false);
 });
