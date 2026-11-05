@@ -27,7 +27,7 @@ last iteration and the head of the plan.
 | `telemetry.mjs` | Transcript metrics, `iterations.jsonl` row, `USAGE_LOG.md` row, `loop-events.jsonl`, heartbeat. |
 | `prompt-assemble.mjs` | Context blocks and prompt assembly; diff-anchor parsing. |
 | `spec-tracker.mjs` | Spec resolution, tracker binding in the spec front matter, plan bootstrap and archive. |
-| `kairos.mjs` | The Kairos tracker: asking whether the run may go on, and reporting what it did. |
+| `kairos.mjs` | The Kairos tracker: asking whether the run may go on, reporting what it did, and the plan in words Kairos can hold. |
 | `agent.mjs` | Resolves and spawns the agent CLI; renders stream events for the console. |
 | `status.mjs`, `fsutil.mjs`, `load-config.mjs` | `status` text; BOM/CRLF-tolerant file helpers; config via `scripts/lib/config.mjs` with a built-in fallback. |
 
@@ -175,10 +175,22 @@ made by a person on its Build tab. The key is not passed to the agent's process.
   question, a stage not yet reached, or, for a build, a decision or validation row before Build each end the run
   (`kairos_stop`, or `budget_item` at the cap). The caps in force are the lower of this repository's and Kairos's,
   and an iteration may spend no more than the item has left.
-- **If Kairos cannot be read:** the run refuses to start. Once going, the last answer stands through a failed read,
-  and three in a row end the run (`kairos_unreachable`), so a stop placed there holds within a few steps.
+- **If Kairos cannot be read:** a plan run goes ahead, and a build or review refuses to start. Once going, a run carries
+  on with the last answer, the plan on disk, and the local caps and kill switch. A run nobody is watching stops after
+  `RALPH_KAIROS_OUTAGE_MIN` minutes (30; `kairos_unreachable`), so a stop placed there holds. `RALPH_KAIROS_ATTENDED=1`
+  says a person is watching, and it keeps going.
 - **It reports** `run_started`, `plan_started`, `build_started`, each iteration's spend, `review_required`,
-  `review_run` and `run_ended`. Reporting never blocks the work: what could not be sent goes with the next report.
+  `review_run` and `run_ended`. Reporting never blocks the work: what could not be sent is kept in a file
+  (`RALPH_KAIROS_OUTBOX`, by default the state directory), and sent in order when Kairos answers, by this run or the next.
+- **The plan is held in Kairos.** The file stays the working copy. After each iteration, once the tick check has run,
+  the driver sends it, with its phases, tasks, decisions and open questions, and whether
+  `verify-plan-completeness --strict` passes. Before each iteration it brings in any newer version a person wrote,
+  keeping the ticks. A fresh copy takes what Kairos holds. A build refuses to start, or stops, while the latest version
+  is not approved.
+- **Scope.** The plan's `## Scope changes` goes with it: what the build included because it blocks an outcome, what it
+  filed as a new item, and what blocks it and needs a person. So do any older `CANDIDATE-SPEC` rows, and any commit tagged
+  `[REVIEW: SCOPE]`, and an iteration's cost is counted against each `S<n>` its commits name. It also sends the files changed
+  since the base, so the owner sees any the plan does not name. Kairos decides what each means (`ralph/TRACKER_kairos.md`).
 - **`blocked`** puts the iteration's `next`, with the plan's open questions, in the owner's queue in Kairos. Later
   runs refuse to start until it is answered, then read the answer in their prompt.
 - **`--skip-tracker`** runs without any of this, with a warning.

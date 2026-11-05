@@ -136,9 +136,9 @@ same time and a combined report hides how much went to meta-work.
 
 The kit automates the loop, not the judgement that sits above it.
 
-- **Plan content is not a manual gate.** There is no "approve the plan" step; a plan advances if it covers
-  the spec (`verify-plan-completeness`) and each tick is earned (`verify-plan-ticks`). You may read and edit
-  it, but nothing waits on you.
+- **Plan content is not a manual gate,** unless a tracker makes it one. A plan advances if it covers the spec
+  (`verify-plan-completeness`) and each tick is earned (`verify-plan-ticks`). You may read and edit it, but nothing
+  waits on you. Under the Kairos tracker, an item that is not Hands-off waits for a person to approve its plan.
 - **Approvals and waivers are human-only.** They carry a person's identity, so the prompts forbid the agent
   from signing them and a `[product]` question that needs one parks the spec.
 - **Product decisions** (`[product]` open questions) are answered by a person or, where the standards already

@@ -26,7 +26,7 @@ import {
   writeHeartbeat, writeIterationRecord,
 } from './telemetry.mjs';
 import { buildAgentArgs, buildAgentEnv, renderEvent, resolveAgent, resolveExecutable, spawnAgent } from './agent.mjs';
-import { answersBlock, capsWithKairos, createKairos, kairosProblem, kairosSettings, MAX_FAILED_READS, productQuestions, stopReasonFor } from './kairos.mjs';
+import { answersBlock, capsWithKairos, createKairos, DEFAULT_OUTAGE_MIN, fileOutbox, kairosProblem, isWorkFile, kairosSettings, planForKairos, planIsWritten, productQuestions, scopeFromCommits, stopReasonFor, withTicks } from './kairos.mjs';
 import { anyCap, budgetDecision, budgetSettings, killSwitchOn, killSwitchPath, recordSpend, spendLogPath, spentOn, today } from './budget.mjs';
 import { statusReport } from './status.mjs';
 
@@ -206,19 +206,27 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         fail("Kairos: this run has no item: name its spec, with tracker_issue in the spec's front matter or --issue KEY.");
         return 1;
       }
-      kairos = createKairos({ ...settings, item: tracker.issue, ...(env.RALPH_KAIROS_RETRY_MS ? { retryMs: Number(env.RALPH_KAIROS_RETRY_MS) } : {}), onLost: (_q, r) => warn(`Kairos refused a report: ${r.message}`) });
+      kairos = createKairos({ ...settings, item: tracker.issue, outbox: fileOutbox(env.RALPH_KAIROS_OUTBOX || stateDir, tracker.issue), ...(env.RALPH_KAIROS_RETRY_MS ? { retryMs: Number(env.RALPH_KAIROS_RETRY_MS) } : {}), onLost: (_q, r) => warn(`Kairos refused a report: ${r.message}`) });
+      /* What an earlier run could not send goes first, so what is read next reflects it. */
+      if (kairos.pending()) {
+        const { failed } = await kairos.flush();
+        if (failed) warn(`${kairos.pending()} report(s) from an earlier run are still waiting: ${failed.message}`);
+      }
       info(`Preflight: asking Kairos whether ${tracker.issue} may ${mode}...`);
       const first = await kairos.controls(mode);
-      if (!first.ok) {
+      if (!first.ok && mode === 'plan' && first.retry) {
+        /* Writing a plan spends only what the local caps allow, and a build still needs its approval. */
+        warn(`Kairos could not be read: ${first.message}. Writing the plan anyway; it goes to Kairos when it answers, and no build starts until it is approved there.`);
+      } else if (!first.ok) {
         fail(`Kairos: ${first.message}. Not starting, since nothing there could stop or limit this run.`);
         return 1;
-      }
-      if (!first.data.go) {
+      } else if (!first.data.go) {
         fail(`Kairos: ${first.data.why}`);
         return 1;
+      } else {
+        controls = first.data;
+        info(`Preflight OK: ${controls.key ?? controls.item} is at ${controls.stage}; ${controls.agency ?? 'agency unknown'}; $${Number(controls.spentUsd).toFixed(2)} spent of ${controls.caps.itemUsd === null ? 'no cap' : `$${Number(controls.caps.itemUsd).toFixed(2)}`}.`);
       }
-      controls = first.data;
-      info(`Preflight OK: ${controls.key ?? controls.item} is at ${controls.stage}; $${Number(controls.spentUsd).toFixed(2)} spent of ${controls.caps.itemUsd === null ? 'no cap' : `$${Number(controls.caps.itemUsd).toFixed(2)}`}.`);
     } else if (agent.isClaude) {
       info('Preflight: checking tracker (Atlassian MCP) connectivity...');
       const exe = resolveExecutable(agent.command, env);
@@ -285,7 +293,59 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   let budget = capsWithKairos(budgetSettings(cfg, env), controls?.caps);
   let runSpent = 0;
   let commits = 0;
-  let failedReads = 0;
+  let downSince = null;
+  const attended = env.RALPH_KAIROS_ATTENDED === '1';
+  const outageMs = (env.RALPH_KAIROS_OUTAGE_MIN !== undefined && env.RALPH_KAIROS_OUTAGE_MIN !== '' ? Number(env.RALPH_KAIROS_OUTAGE_MIN) : DEFAULT_OUTAGE_MIN) * 60000;
+  /* The version of the plan this copy was last read from. */
+  let planVersion = null;
+  /* Brings a newer version in, before the next step reads it: always a person's words, and on a fresh copy, whatever Kairos holds. */
+  const syncPlan = async () => {
+    const version = controls?.plan?.version ?? null;
+    if (version === null || version === planVersion) return;
+    const held = await kairos.plan();
+    if (!held.ok || held.data.version === null) {
+      if (!held.ok) warn(`The plan could not be read from Kairos: ${held.message}`);
+      return;
+    }
+    if (planVersion === null || held.data.byPerson) {
+      const before = readText(planFile);
+      const after = withTicks(held.data.markdown, before, held.data.phases);
+      if (after !== before) {
+        writeText(planFile, after);
+        info(`Took version ${held.data.version} of the plan from Kairos${held.data.byPerson ? ', changed by a person' : ''}.`);
+      }
+    }
+    planVersion = held.data.version;
+  };
+  /* What each thing it found outside the spec has cost this run. */
+  const scopeCost = {};
+  const commitsBetween = (from, to) => {
+    const log = runGit(root, ['log', '--format=%H%x00%B%x01', `${from}..${to}`]);
+    return log.ok ? log.out.split('\x01').map((e) => e.trim()).filter(Boolean).map((e) => ({ sha: e.split('\0')[0], message: e.split('\0')[1] ?? '' })) : [];
+  };
+  /* After the tick check, so what Kairos hears is what earned its tick, not what the agent claimed. */
+  const reportPlan = async (head, { before = null, costUsd = 0 } = {}) => {
+    const markdown = readText(planFile);
+    if (!planIsWritten(markdown)) return;
+    /* The driver reads the branch for itself, so what the agent left out of the plan is still seen. */
+    const base = runGit(root, ['merge-base', `origin/${cfg.project?.baseBranch || 'main'}`, 'HEAD']);
+    const sinceBase = base.ok && base.out ? commitsBetween(base.out, head) : [];
+    const changedFiles = base.ok && base.out ? runGit(root, ['diff', '--name-only', base.out, head]).out.split(/\r?\n/).filter((f) => f && isWorkFile(f)).slice(0, 200) : undefined;
+    const fromThis = before && before !== head ? scopeFromCommits(commitsBetween(before, head)).named : new Map();
+    if (fromThis.size && costUsd) for (const id of fromThis.keys()) scopeCost[id] = Math.round(((scopeCost[id] ?? 0) + costUsd / fromThis.size) * 10000) / 10000;
+    const known = planForKairos(markdown);
+    const { named, unnamed } = scopeFromCommits(sinceBase);
+    const specText = spec ? readText(path.resolve(root, spec)) : '';
+    const scope = [...known.scope, ...unnamed].map((r) => ({
+      ...r,
+      commits: [...new Set([...(r.commits ?? []), ...(named.get(r.id) ?? []).map((sha) => sha.slice(0, 12))])],
+      ...(scopeCost[r.id] ? { costUsd: scopeCost[r.id] } : {}),
+      ...(r.blocks && specText.includes(r.blocks) ? { blocksInSpec: true } : {}),
+    }));
+    const checker = path.join(root, 'scripts', 'verify-plan-completeness.mjs');
+    const complete = Boolean(spec) && fs.existsSync(checker) && spawnSync(process.execPath, [checker, '--spec', spec, '--strict'], { cwd: root, encoding: 'utf8', shell: false, env: { ...env, RALPH_ROOT: root } }).status === 0;
+    await tell('plan', { plan: { markdown, ...known, scope, ...(changedFiles ? { changedFiles } : {}), basedOn: planVersion, complete, commit: head ? head.slice(0, 12) : null } });
+  };
   /* What Kairos hears. Reporting never holds up the work. */
   const tell = async (event, fields = {}) => {
     if (!kairos) return null;
@@ -295,6 +355,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     return sent;
   };
   await tell('run_started');
+  if (kairos && controls) await syncPlan();
   let spendDay = today();
   let daySpent = spentOn(readJsonl(spendLogPath(stateDir, env)), spendDay);
   emit('budget', { ...budget, day_usd: daySpent });
@@ -322,7 +383,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       if (kairos) {
         const read = await kairos.controls(mode);
         if (read.ok) {
-          failedReads = 0;
+          downSince = null;
           controls = read.data;
           budget = capsWithKairos(budgetSettings(cfg, env), controls.caps);
           if (!controls.go) {
@@ -331,17 +392,19 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
             stopReason = stopReasonFor(controls.code);
             break;
           }
+          await syncPlan();
         } else if (!read.retry) {
           say('');
           warn(`KAIROS - ${read.message} Stopping before iteration ${iter + 1}.`);
           stopReason = 'kairos_stop';
           break;
         } else {
-          failedReads += 1;
-          warn(`Kairos could not be read (${failedReads} of ${MAX_FAILED_READS}): ${read.message}`);
-          if (failedReads >= MAX_FAILED_READS) {
+          if (downSince === null) downSince = Date.now();
+          const downMin = Math.round((Date.now() - downSince) / 6000) / 10;
+          warn(`Kairos could not be read, for ${downMin} minute(s) now: ${read.message}. Going on with the last answer and the plan on disk.`);
+          if (!attended && Date.now() - downSince >= outageMs) {
             say('');
-            warn(`KAIROS - it has not answered ${MAX_FAILED_READS} times in a row, so a stop placed there would not be seen. Stopping.`);
+            warn(`KAIROS - it has not answered for ${downMin} minute(s), and nobody is watching this run, so a stop placed there would not be seen. Stopping.`);
             stopReason = 'kairos_unreachable';
             break;
           }
@@ -408,7 +471,11 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       const trackerBlock = !tracker.enabled || !tracker.issue
         ? null
         : kairos
-          ? { ...tracker, text: readText(path.join(root, 'ralph', 'TRACKER_kairos.md')), answers: answersBlock(controls?.answers) }
+          ? {
+              ...tracker,
+              text: `${readText(path.join(root, 'ralph', 'TRACKER_kairos.md'))}\n\n**What this item's build may do on its own: ${controls?.agency ?? 'balanced'}.**`,
+              answers: [answersBlock(controls?.answers), controls?.plan?.comments ? `- **The plan was sent back.** ${controls.plan.comments}` : '', ...(controls?.rejected ?? []).map((r) => `- **A person rejected ${r.id}.** ${r.what}. Why: ${r.why}. Take it out of this work.`)].filter(Boolean).join('\n'),
+            }
           : {
               ...tracker,
               state: `${path.relative(root, stateDir).replace(/\\/g, '/')}/tracker/${specName}.json`,
@@ -538,6 +605,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         writeText(lastGateFile, JSON.stringify({ iter, ticks }));
       }
 
+      if (kairos) await reportPlan(headAfter, { before: headBefore, costUsd: Number(row.cost_usd) || 0 });
+
       // ---- push ----
       if (row.committed) {
         const pushed = pushBranch({ root, branch });
@@ -586,7 +655,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   } finally {
     emit('loop_stop', { reason: stopReason, iterations: iter, wall_s: Math.round((Date.now() - loopStart) / 1000) });
     await tell('run_ended', { stopReason });
-    if (kairos?.pending()) warn(`${kairos.pending()} report(s) to Kairos could not be sent. The run's record is still in Git.`);
+    if (kairos?.pending()) warn(`${kairos.pending()} report(s) to Kairos could not be sent. They are kept, and go with the next run.`);
     removeHeartbeat(stateDir);
     for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK']) process.removeListener(sig, onSignal);
   }

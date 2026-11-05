@@ -13,6 +13,7 @@ const VOLATILE = [
   /(^|\/)\.loop-heartbeat$/,
   /(^|\/)\.last-iteration-end$/,
   /(^|\/)PREFLIGHT_FAILURE\.md$/,
+  /(^|\/)kairos-outbox\.[^/]*\.jsonl$/,
   /(^|\/)\.ralph\/logs\//,
 ];
 

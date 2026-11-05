@@ -9,6 +9,7 @@
 .ralph/logs/
 .ralph/base-health.json
 .ralph/tracker/
+.ralph/kairos-outbox.*
 
 # Scratch space for runners, worktrees and agents
 .claude-temp/
