@@ -153,6 +153,11 @@ const TEST_ROW = /^`?\[(?:unit|integration|e2e|visual-only)\]/;
 
 /** A plan line's words, without its checkbox, emphasis, marker, model tag or commit, so a tick can be matched to its line. */
 const lineWords = (text) => splitTaskId(String(text).trimStart()).words.replace(NEXT_MARK, '').replace(MODEL_TAG, '').replace(SHA_AT_END, '').replace(/\*\*/g, '').replace(SHA_AT_END, '').trim();
+/** `{ id }` when a task's text leads with one, else nothing, so a task with no id is sent as before. */
+const taskIdField = (text) => {
+  const { id } = splitTaskId(String(text).trimStart());
+  return id ? { id } : {};
+};
 const phaseId = (title) => {
   const n = /^Phase\s+(\d+[a-z]?)\b/i.exec(title);
   if (n) return `phase-${n[1].toLowerCase()}`;
@@ -236,7 +241,7 @@ export function planForKairos(planText) {
     const tests = /^\s+Tests:\s*(.+)$/i.exec(raw);
     const files = /^\s+Files:\s*(.+)$/i.exec(raw);
     if (t && TEST_ROW.test(t[2].trim())) phase.tests.push(t[2].trim().slice(0, 1000));
-    else if (t && lineWords(t[2])) phase.tasks.push({ ...(splitTaskId(t[2].trimStart()).id ? { id: splitTaskId(t[2].trimStart()).id } : {}), text: lineWords(t[2]).slice(0, 1000), done: t[1].toLowerCase() === 'x', commit: SHA_AT_END.exec(t[2])?.[1] ?? null });
+    else if (t && lineWords(t[2])) phase.tasks.push({ ...taskIdField(t[2]), text: lineWords(t[2]).slice(0, 1000), done: t[1].toLowerCase() === 'x', commit: SHA_AT_END.exec(t[2])?.[1] ?? null });
     else if (tests) phase.tests.push(tests[1].trim().slice(0, 1000));
     else if (files) phase.files.push(...filesIn(files[1]));
   }
@@ -275,12 +280,17 @@ export function withTicks(markdown, localText, phases = []) {
   const doneIds = new Set();
   const doneWords = new Set();
   const doneUnnumbered = new Set();
+  const numberedWords = new Set();
+  /* This copy is read first, so a done task Kairos returns without its id (before KAI-69) but with the words of
+     a done task here that has one is that task, and its words tick no other id. */
   const note = (text, id = null) => {
     const own = id ?? splitTaskId(String(text).trimStart()).id;
     const words = lineWords(text);
     doneWords.add(words);
-    if (own) doneIds.add(own);
-    else doneUnnumbered.add(words);
+    if (own) {
+      doneIds.add(own);
+      numberedWords.add(words);
+    } else if (!numberedWords.has(words)) doneUnnumbered.add(words);
   };
   for (const line of String(localText || '').split(/\r?\n/)) {
     const m = /^\s*- \[[xX]\] (.+)$/.exec(line);

@@ -63,7 +63,7 @@ aliases in `ralph.config.json` `models`.
 
 The build loop chooses its model from the first unchecked task under the `<- NEXT` phase: a `[haiku]`
 (or `[mechanical]`) tag selects the mechanical model, anything else the execution model. Untagged tasks
-that start with regenerate / re-run / rename / reformat / sync docs are treated as mechanical; add
+whose words (after the task id) start with regenerate / re-run / rename / reformat / sync docs are treated as mechanical; add
 `[sonnet]` to opt one out. A task mixing both kinds is two tasks.
 
 Every subagent launch names its `model` (the `require-agent-model` hook blocks a launch that does not,

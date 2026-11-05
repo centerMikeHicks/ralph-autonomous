@@ -177,7 +177,7 @@ Co-Authored-By: <agent> <noreply@anthropic.com>
 | Cannot tell where code belongs | `Explore` or `Plan` subagent (or `architecture` if defined), then decide and record a Decision |
 | Ambiguous spec | `[product]` Open Question with the options; take the next unblocked task |
 | Failing check unrelated to your diff | prove it with `base-health --compare`; if tooling, fix it in a `Tooling:` commit |
-| Task too big | split it in the plan, finish the first part, exit |
+| Task too big | split it in the plan (the parts get new ids; the old id is retired), finish the first part, exit |
 | Tests fail | fix before committing; never commit a red slice |
 | Missing prerequisite another spec owns | `[product]` Open Question naming it |
 

@@ -251,6 +251,12 @@ test('sameWordsUnderAnotherIdStayOpen', () => {
   assert.equal(out, '  - [ ] P1.T2 Add the list\n');
 });
 
+test('Kairos dropping a done task\'s id does not let its words tick another id', () => {
+  /* Before KAI-69 Kairos returns this copy's done P1.T1 without its id: it is still P1.T1, not an unnumbered task. */
+  const out = ticks('  - [ ] P1.T1 Add the list\n  - [ ] P1.T2 Add the list\n', '  - [x] P1.T1 Add the list (abc1234)\n', [{ text: 'Add the list', done: true }]);
+  assert.equal(out, '  - [x] P1.T1 Add the list\n  - [ ] P1.T2 Add the list\n');
+});
+
 test('unnumberedDoneTaskTicksLineWithId', () => {
   const out = ticks('  - [ ] P1.T1 Add the list\n', '  - [x] Add the list\n');
   assert.equal(out, '  - [x] P1.T1 Add the list\n');

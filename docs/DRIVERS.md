@@ -91,7 +91,7 @@ Blocks are joined with `---` separators, in this order, and `PROMPT_<mode>.md` f
 
 The next task is the first unchecked indented task under the phase marked `<- NEXT` (or the first
 unchecked phase when nothing is marked). It is mechanical when tagged `[haiku]` or `[mechanical]`,
-or, unless tagged `[sonnet]`, when it starts with `[DOC]`, regenerate, re-run, re-capture, codemod,
+or, unless tagged `[sonnet]`, when its words after any task id (`P2.T3`) start with `[DOC]`, regenerate, re-run, re-capture, codemod,
 rename, reformat, `update the (ledger|changelog|docs)` or `bump version`. The mechanical test runs
 before the Exit Gate test. Exit Gate next means a line matching `Exit Gate.*(<-|←)\s*NEXT`, or the
 first unchecked phase mentions Exit Gate. Build never selects the planning model.
