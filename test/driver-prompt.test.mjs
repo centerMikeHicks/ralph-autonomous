@@ -7,6 +7,7 @@ import { assemblePrompt, parseDiffAnchors } from '../ralph/lib/prompt-assemble.m
 import {
   atlassianConnected, frontMatterValue, resolveSpec, resolveTracker, setFrontMatterValue, archiveOutgoingPlan,
 } from '../ralph/lib/spec-tracker.mjs';
+import { splitTaskId } from '../ralph/lib/plan-parse.mjs';
 import { parseArgs } from '../ralph/lib/run-loop.mjs';
 import { buildAgentArgs, resolveAgent, splitCommand } from '../ralph/lib/agent.mjs';
 
@@ -135,4 +136,31 @@ test('agent command: RALPH_AGENT_CMD overrides config, quotes are honoured, flag
   const fake = resolveAgent(cfg, { RALPH_AGENT_CMD: 'node /x/fake.mjs' });
   assert.deepEqual([fake.command, fake.isClaude, fake.baseArgs.slice(0, 2)], ['node', false, ['/x/fake.mjs', '-p']]);
   assert.deepEqual(buildAgentArgs({ agent: fake, cfg, model: 'm', effort: '', root: os.tmpdir() }), ['/x/fake.mjs', '-p', '--model', 'm']);
+});
+
+const readKit = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+
+test('planPromptAsksForTaskIds', () => {
+  for (const rel of ['ralph/PROMPT_plan.md', 'ralph/CONVENTIONS.md']) {
+    const text = readKit(rel);
+    assert.match(text, /P<n>\.T<m>/, `${rel} names the task id format`);
+    assert.match(text, /EG\.T<m>/, `${rel} names the Exit Gate id format`);
+    assert.match(text, /never reused/i, `${rel} says an id is never reused`);
+    assert.match(text, /renumber/i, `${rel} says an id is never renumbered`);
+    assert.match(text, /split[^.\n]*new ids?/i, `${rel} says a split task's parts get new ids`);
+  }
+});
+
+test('conventionsPlanExampleCarriesIds', () => {
+  const text = readKit('ralph/CONVENTIONS.md');
+  const example = /### Plan[^\n]*\n+```markdown\n([\s\S]*?)\n```/.exec(text)?.[1] ?? '';
+  const tasks = example.split('\n').map((l) => /^\s+- \[[ xX]\] (.+)$/.exec(l)).filter(Boolean);
+  assert.ok(tasks.length > 0, 'the plan example has task lines');
+  for (const m of tasks) assert.ok(splitTaskId(m[1]).id, `task has an id: ${m[1]}`);
+});
+
+test('buildPromptKeepsIdWhenCollapsing', () => {
+  const text = readKit('ralph/PROMPT_build.md');
+  const step7 = /## Step 7[\s\S]*?(?=\n## |$)/.exec(text)?.[0] ?? '';
+  assert.match(step7, /keep[^.\n]*\bid\b[^.\n]*collaps|collaps[^.\n]*keep[^.\n]*\bid\b/i);
 });

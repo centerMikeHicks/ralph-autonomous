@@ -112,6 +112,11 @@ Edit `.ralph/IMPLEMENTATION_PLAN.md` to exactly the shape in `ralph/CONVENTIONS.
   one commit each.
 - **Every task carries `Files:`** (repo-relative paths, plus symbols where useful) and **`Tests:`**.
   A task whose files you cannot name is not yet planned.
+- **Put an id on every task**: `P<n>.T<m>` (phase n, task m), and `EG.T<m>` in the Exit Gate, written
+  first in the task text (`- [ ] P2.T1 Add the parser [sonnet]`). When refining, keep every existing id:
+  an id is never reused and never renumbered, even when tasks are removed or reordered. A new task takes
+  the next free number. When you split a task, the parts get new ids and the old id is not reused. A plan
+  that has no ids yet gets them added, in order, without changing the tasks' words (D8).
 - **Tag every task** `[haiku]` (mechanical, unambiguous, checkable) or `[sonnet]` (judgement; the
   default). Never tag anything for the largest model; build runs on the execution and mechanical
   models only.

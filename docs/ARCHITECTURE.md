@@ -58,6 +58,15 @@ cannot diverge. Gates take their configuration from `ralph.config.json` and read
 | `.claude-temp/ralph-queue/` | the queue runner | `QUEUE.md` (input and status board), `state.json`, `events.jsonl`, `STOP`. |
 | `.claude-temp/<topic>/TALK.md` | the `autonomous` skill | Its `[REVIEW]`, `[REVIEW: SCOPE]` and `[ASK]` entries; an index of decisions also recorded in the spec or plan. `scripts/ralph-decisions.mjs` reads it with the spec, plan, queue and git log ([DECISIONS.md](DECISIONS.md)). |
 
+## How a tick follows a task's id
+
+Each plan task starts with a stable id (`P2.T1`, `EG.T1`). `planForKairos` sends the plan to Kairos with
+each task's id as a field apart from its words. When the plan comes back, `withTicks` ticks an open line by
+its id (D7): a line with an id is ticked only by a done task with that id, or by a done task that has no
+id and the same words; a line with no id is ticked by the same words. So a person rewording a task in Kairos
+does not lose its tick. Until KAI-69 is live Kairos drops the id and returns tasks without it, and the words
+match covers that case.
+
 ## The ledger as a state machine
 
 ```

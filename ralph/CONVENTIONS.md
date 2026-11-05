@@ -85,7 +85,7 @@ Base `<sha>` (measured <date>) is **GREEN**.     <!-- or: **Base is red.** ... -
 ## Phases
 - [ ] **Phase 1: <title>** <- NEXT
   gate: <optional clause>
-  - [ ] <task text> [sonnet]
+  - [ ] P1.T1 <task text> [sonnet]
     Files: path/a.ext, path/b.ext (symbols)
     Tests: <acceptance test names copied verbatim from the spec>
 - [ ] **Exit Gate**
@@ -104,6 +104,10 @@ Base `<sha>` (measured <date>) is **GREEN**.     <!-- or: **Base is red.** ... -
 - `gate: <clause>` on a phase line is an optional machine-checkable definition of done that a
   project-specific verifier may evaluate when the phase is ticked. A phase without a clause is never
   reverted for it.
+- Every task starts with a stable id: `P<n>.T<m>` (phase n, task m) or `EG.T<m>` in the Exit Gate.
+  The id follows the task through refinement and into the tracker, which keeps its tick by it. An id is
+  never reused and never renumbered; a split task's parts get new ids; a plan with no ids has them added
+  without changing the tasks' words.
 - A completed phase collapses to one line: `- [x] **Phase 2: <title>** (abc1234)`.
 - Decision ids are `D<n>`, minted by incrementing the highest in the spec and plan; never reused.
 

@@ -154,7 +154,7 @@ Check the phase's acceptance criteria one by one before committing.
 
 ## Step 7: Update state and commit
 
-1. Plan: collapse the finished phase or task to one line with its SHA; move `<- NEXT` to the next phase
+1. Plan: collapse the finished phase or task to one line with its SHA, and keep the task's id when collapsing it; move `<- NEXT` to the next phase
    when the phase's last task is done; delete duplicates. Narrative belongs in the commit message.
 2. `git status --short`; `git add <only the paths you changed> .ralph/IMPLEMENTATION_PLAN.md`;
    `git diff --staged --stat` and read it; commit:

@@ -21,6 +21,7 @@ Kairos holds the plan. You still read and edit `.ralph/IMPLEMENTATION_PLAN.md`; 
 
 - under `## Decisions`, each decision you make on your own is one line that a person can read without opening the code: they see it on the item;
 - if the plan was sent back, a person's words are below this block: change the plan to answer them, and do no more than that;
+- a task you reword keeps its id; a task you split gives its parts new ids, because the tracker keeps ticks by id;
 - change a phase or its tests only if you must. It needs approving again before the build can go on, and the run stops until it is. Splitting a task inside a phase does not.
 
 ### What you may decide
