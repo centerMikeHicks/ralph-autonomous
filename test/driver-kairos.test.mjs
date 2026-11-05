@@ -620,7 +620,7 @@ test('personsRewordKeepsTickThroughTheLoop', { timeout: 60000 }, async () => {
       }
       return { agency: 'hands-off', plan: { state: 'approved', version, comments: null } };
     },
-    () => ({ version, markdown: theirs, phases: [], byPerson })
+    () => ({ version, markdown: theirs, phases: [{ title: 'Phase 1: Demo', done: false, tasks: [{ id: 'P1.T1', text: 'task one', done: true }, { text: 'task two', done: true }] }], byPerson })
   );
   try {
     const r = await loop(dir, ['build', '2', 'specs/demo.md'], { iterations: [commit(1), commit(2)] }, { KAIROS_URL: k.url });
@@ -631,6 +631,7 @@ test('personsRewordKeepsTickThroughTheLoop', { timeout: 60000 }, async () => {
     assert.match(after, /- \[x\] P1\.T1 task one, said another way/);
     assert.equal(plans[1].plan.phases[0].tasks[0].id, 'P1.T1');
     assert.equal(plans[1].plan.phases[0].tasks[0].text, 'task one, said another way');
+    assert.equal(plans[1].plan.phases[0].tasks[0].done, true);
   } finally {
     await k.close();
     fs.rmSync(dir, { recursive: true, force: true });

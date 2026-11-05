@@ -116,6 +116,18 @@ test('testRowsAndOpenQuestionsNeedNoId', () => {
 
 test('strictFailsOnIdFindings', withProject((dir) => {
   editPlan(dir, (p) => p
+    .replace('Build `formatGreeting`', 'P1.T1 Build `formatGreeting`')
+    .replace('Build `run`', 'P1.T1 Build `run`'));
+  const loose = run(dir, ['--spec', 'specs/hello.md']);
+  assert.equal(loose.status, 0, loose.out);
+  assert.match(loose.out, /REPEATED ID/);
+  const strict = run(dir, ['--spec', 'specs/hello.md', '--strict']);
+  assert.equal(strict.status, 1, strict.out);
+  assert.match(strict.out, /REPEATED ID/);
+}));
+
+test('strictFailsOnAMissingId', withProject((dir) => {
+  editPlan(dir, (p) => p
     .replace('Build `run`', 'P2.T1 Build `run`')
     .replace('    Tests: cliPrintsGreeting', '    Tests: cliPrintsGreeting\n  - [ ] Print the exit code [sonnet]\n    Files: src/cli.mjs'));
   const loose = run(dir, ['--spec', 'specs/hello.md']);

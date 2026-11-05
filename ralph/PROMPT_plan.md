@@ -116,7 +116,7 @@ Edit `.ralph/IMPLEMENTATION_PLAN.md` to exactly the shape in `ralph/CONVENTIONS.
   first in the task text (`- [ ] P2.T1 Add the parser [sonnet]`). When refining, keep every existing id:
   an id is never reused and never renumbered, even when tasks are removed or reordered. A new task takes
   the next free number. When you split a task, the parts get new ids and the old id is not reused. A plan
-  that has no ids yet gets them added, in order, without changing the tasks' words (D8).
+  that has no ids yet gets them added, in order, without changing the tasks' words.
 - **Tag every task** `[haiku]` (mechanical, unambiguous, checkable) or `[sonnet]` (judgement; the
   default). Never tag anything for the largest model; build runs on the execution and mechanical
   models only.
