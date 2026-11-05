@@ -72,3 +72,56 @@ test('usage: missing plan exits 2', withProject((dir) => {
   fs.rmSync(path.join(dir, '.ralph', 'IMPLEMENTATION_PLAN.md'));
   assert.equal(run(dir, ['--spec', 'specs/hello.md']).status, 2);
 }));
+
+// --- stable ids ----------------------------------------------------------------------------------
+const readFixture = (rel) => fs.readFileSync(path.join(process.cwd(), 'test', 'fixtures', 'example-project', rel), 'utf8').replace(/\r\n/g, '\n');
+const idSpec = () => readFixture('specs/hello.md');
+const idPlan = () => readFixture('.ralph/IMPLEMENTATION_PLAN.md');
+const lineOf = (plan, needle) => plan.split('\n').findIndex((l) => l.includes(needle)) + 1;
+
+test('planWithoutIdsHasNoIdFindings', () => {
+  const r = checkPlanCompleteness(idSpec(), idPlan());
+  assert.deepEqual(r.missingIds, []);
+  assert.deepEqual(r.repeatedIds, []);
+});
+
+test('mixedPlanReportsTaskWithoutId', () => {
+  const plan = idPlan()
+    .replace('Build `formatGreeting`', 'P1.T1 Build `formatGreeting`')
+    .replace('Build `run`', 'P2.T1 Build `run`')
+    .replace('    Tests: cliPrintsGreeting', '    Tests: cliPrintsGreeting\n  - [ ] Print the exit code [sonnet]\n    Files: src/cli.mjs');
+  const r = checkPlanCompleteness(idSpec(), plan);
+  assert.deepEqual(r.missingIds, [{ line: lineOf(plan, 'Print the exit code'), text: '- [ ] Print the exit code [sonnet]' }]);
+  assert.deepEqual(r.repeatedIds, []);
+});
+
+test('repeatedIdReported', () => {
+  const plan = idPlan()
+    .replace('Build `formatGreeting`', 'P1.T1 Build `formatGreeting`')
+    .replace('Build `run`', 'P1.T1 Build `run`');
+  const r = checkPlanCompleteness(idSpec(), plan);
+  assert.deepEqual(r.repeatedIds, [{ id: 'P1.T1', lines: [lineOf(plan, 'Build `formatGreeting`'), lineOf(plan, 'Build `run`')] }]);
+});
+
+test('testRowsAndOpenQuestionsNeedNoId', () => {
+  const plan = idPlan()
+    .replace('Build `formatGreeting`', 'P1.T1 Build `formatGreeting`')
+    .replace('Build `run`', 'P2.T1 Build `run`')
+    .replace('    Tests: cliPrintsGreeting', '    Tests: cliPrintsGreeting\n  - [ ] `[unit]` cliPrintsGreeting is the row, not a task')
+    .replace('## Open Questions / Blocked\n\nNone.', '## Open Questions / Blocked\n\n- [ ] [product] Is the greeting localised?');
+  const r = checkPlanCompleteness(idSpec(), plan);
+  assert.deepEqual(r.missingIds, []);
+  assert.deepEqual(r.repeatedIds, []);
+});
+
+test('strictFailsOnIdFindings', withProject((dir) => {
+  editPlan(dir, (p) => p
+    .replace('Build `run`', 'P2.T1 Build `run`')
+    .replace('    Tests: cliPrintsGreeting', '    Tests: cliPrintsGreeting\n  - [ ] Print the exit code [sonnet]\n    Files: src/cli.mjs'));
+  const loose = run(dir, ['--spec', 'specs/hello.md']);
+  assert.equal(loose.status, 0, loose.out);
+  assert.match(loose.out, /MISSING ID/);
+  const strict = run(dir, ['--spec', 'specs/hello.md', '--strict']);
+  assert.equal(strict.status, 1, strict.out);
+  assert.match(strict.out, /MISSING ID/);
+}));

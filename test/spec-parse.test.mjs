@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   parseAcceptanceRow, parseSpecPhases, parseSuccessCriteria, parseDecisions, parsePlan, planPhaseOf,
-  parseFrontMatter, findSpecPhase, tableRows, sectionLines, splitLines,
+  parseFrontMatter, findSpecPhase, tableRows, sectionLines, splitLines, taskIdOf,
 } from '../scripts/lib/spec-parse.mjs';
+import { splitTaskId } from '../ralph/lib/plan-parse.mjs';
 import { globToRegExp, compileGlobs, walkFiles } from '../scripts/lib/glob.mjs';
 import { parseArgs } from '../scripts/lib/args.mjs';
 import { FIXTURE, tmpDir, rmDir, writeFiles } from './helpers/kit.mjs';
@@ -117,4 +118,12 @@ test('parseArgs accepts --k v and --k=v, flags, and rejects unknown options', ()
   assert.deepEqual(a._, ['pos']);
   assert.throws(() => parseArgs(['--nope'], {}), /unknown option/);
   assert.throws(() => parseArgs(['--spec'], { opts: ['spec'] }), /needs a value/);
+});
+
+test('taskIdParsersAgree', () => {
+  const texts = [
+    'P2.T3 Add the list [sonnet]', 'EG.T1 Run the gate', 'P1a.T2 Fix it', 'P10.T1 x',
+    'Phase 2 work', 'P2-T3 x', 'p2.t3 x', 'P2.T3x x', 'Add the list', '', 'P2.T3', 'EG.T', ' P2.T3 lead',
+  ];
+  for (const t of texts) assert.equal(taskIdOf(t), splitTaskId(t).id, JSON.stringify(t));
 });

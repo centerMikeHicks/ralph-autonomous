@@ -25,13 +25,18 @@
  *
  *   node scripts/verify-plan-completeness.mjs --spec S [--plan P] [--strict] [--json]
  *
+ * STABLE IDS
+ *   A task may lead with an id (`P2.T3 Add the list`). Once any task has one, each task without one
+ *   is a finding (`missingIds`), and an id on two tasks is a finding (`repeatedIds`). Phase lines and
+ *   test rows are not tasks.
+ *
  * Without --strict findings are advisory (exit 0). Exit 0 = complete (or advisory),
  * 1 = findings under --strict, 2 = cannot run.
  */
 import fs from 'node:fs';
 import { parseArgs, usageExit } from './lib/args.mjs';
 import { getContext, readText } from './lib/context.mjs';
-import { parseSpecPhases, parseDecisions, sectionLines, tableRows, splitLines, planPhaseOf } from './lib/spec-parse.mjs';
+import { parseSpecPhases, parseDecisions, sectionLines, tableRows, splitLines, planPhaseOf, taskIdOf } from './lib/spec-parse.mjs';
 
 const IN_SCOPE = /\b(ships?|shipped|in scope|builds? now|built now|is built|are built|built in phase \d|is added|are added|is (?:in|part of) phase \d|added (?:in|to|with) phase \d|phase \d+[a-z]? (?:adds|added)|in v1|for v1|delivered)\b/i;
 const OUT_OF_SCOPE = /\b(out of scope|not (?:in scope|built|offered|created|done|shipped|migrated|planned)|never (?:planned|built)|not in v1|isn't built|follow-?up|deferred|left to the user|for the user to|user to decide|not done here|stays? a waiver|left as-is)\b/i;
@@ -146,7 +151,16 @@ export function checkPlanCompleteness(specText, planText) {
   const tasksWithoutFiles = units
     .filter((u) => !u.ticked && !u.isTestRow && !carriesFiles(u) && !(u.isPhase && (u.subTasks ?? []).length))
     .map((u) => ({ line: u.line, text: u.text.split('\n')[0].trim().slice(0, 100) }));
-  return { items: items.length, decisions: decisions.map(plain), unreferenced, withoutFiles, tasksWithoutFiles, referenced };
+  // Stable ids: once any task has one, every task without one is a finding; an id on two tasks is one too.
+  const tasks = units.filter((u) => !u.isPhase && !u.isTestRow).map((u) => {
+    const first = u.text.split('\n')[0];
+    return { line: u.line, text: first.trim().slice(0, 100), id: taskIdOf(first.replace(/^\s*-\s*\[[ xX]\]\s*/, '')) };
+  });
+  const missingIds = tasks.some((t) => t.id) ? tasks.filter((t) => !t.id).map(({ line, text }) => ({ line, text })) : [];
+  const linesById = new Map();
+  for (const t of tasks) if (t.id) linesById.set(t.id, [...(linesById.get(t.id) ?? []), t.line]);
+  const repeatedIds = [...linesById].filter(([, lines]) => lines.length > 1).map(([id, lines]) => ({ id, lines }));
+  return { items: items.length, decisions: decisions.map(plain), unreferenced, withoutFiles, tasksWithoutFiles, referenced, missingIds, repeatedIds };
 }
 
 // --- CLI -----------------------------------------------------------------------------------------
@@ -162,7 +176,8 @@ function main() {
     usageExit(`verify-plan-completeness: need a spec (${specArg ?? 'none given and no ACTIVE_SPEC'}) and a plan (${planPath})`, USAGE);
   }
   const result = checkPlanCompleteness(readText(specPath), readText(planPath));
-  const total = result.unreferenced.length + result.withoutFiles.length + result.tasksWithoutFiles.length;
+  const total = result.unreferenced.length + result.withoutFiles.length + result.tasksWithoutFiles.length
+    + result.missingIds.length + result.repeatedIds.length;
   if (args.json) {
     console.log(JSON.stringify({ spec: specArg, plan: planPath, strict: Boolean(args.strict), findings: total, ...result }, null, 2));
   } else {
@@ -170,6 +185,8 @@ function main() {
     for (const u of result.unreferenced) console.log(`  UNREFERENCED  ${u.kind} spec:${u.line}  ${u.id}${u.kind === 'decision' ? ` (in scope: "${u.positive}")` : ''}`);
     for (const u of result.withoutFiles) console.log(`  NO FILES:     ${u.kind} spec:${u.line}  ${u.id} — referenced only by open task(s) at plan:${u.tasks.join(',')} with no \`Files:\` line`);
     for (const t of result.tasksWithoutFiles) console.log(`  TASK NO FILES plan:${t.line}  ${t.text}`);
+    for (const t of result.missingIds) console.log(`  MISSING ID   plan:${t.line}  ${t.text}`);
+    for (const r of result.repeatedIds) console.log(`  REPEATED ID  ${r.id}  plan:${r.lines.join(',')}`);
     console.log(`[plan-completeness] ${total} finding(s)${args.strict ? '' : ' (advisory — pass --strict to fail)'}`);
   }
   process.exit(args.strict && total ? 1 : 0);

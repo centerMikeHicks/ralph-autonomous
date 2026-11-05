@@ -207,6 +207,15 @@ export function planPhaseOf(line) {
   return { ticked: /[xX]/.test(m[1]), key: m[2] ? phaseKey(m[2]) : 'exit-gate', id: m[2] ?? null, title: (m[3] ?? 'Exit Gate').replace(NEXT_RE, '').trim() };
 }
 
+// The same pattern as TASK_ID in ralph/lib/plan-parse.mjs; test/spec-parse.test.mjs holds both to one answer.
+const TASK_ID_RE = /^(?:P\d+[a-z]?|EG)\.T\d+(?=\s|$)/;
+
+/** The stable id a task's text leads with (`P2.T3`), or null when it has none. */
+export function taskIdOf(text) {
+  const m = TASK_ID_RE.exec(String(text ?? ''));
+  return m ? m[0] : null;
+}
+
 /**
  * The plan's phases with their tasks. A phase owns every line up to the next column-0
  * checkbox or heading; tasks are its indented checkboxes, each with `Files:` / `Tests:`
