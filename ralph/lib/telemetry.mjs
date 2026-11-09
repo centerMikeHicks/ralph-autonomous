@@ -2,6 +2,7 @@
 // loop-events.jsonl events. The shells never write these files; this module does, BOM-free.
 import fs from 'node:fs';
 import path from 'node:path';
+import { collectTestRuns, summariseTestRuns, testClaimMismatch, testMatcher } from './test-runs.mjs';
 import { appendLine, ensureDir, readJson, readText, splitLines, writeText } from './fsutil.mjs';
 
 export const USAGE_HEADER = `# Ralph Usage Log
@@ -39,13 +40,13 @@ export function parseTranscript(lines) {
  * How the iteration spent its time, from the stream-json events: the final `result` event's
  * model-vs-wall split, turn count, usage and cost, plus tool-call counts by name.
  */
-export function transcriptMetrics(lines, { testPattern } = {}) {
+export function transcriptMetrics(lines, { testPattern, testCommands } = {}) {
   const m = {
     duration_ms: 0, api_ms: 0, turns: 0, is_error: false, stop_reason: '',
     input: 0, output: 0, cache_r: 0, cache_w: 0, cost: 0,
-    tool_calls: 0, tools: {}, tests_run: 0, subagents: 0, subagent_ms: 0,
+    tool_calls: 0, tools: {}, tests_run: 0, test_runs: [], subagents: 0, subagent_ms: 0,
   };
-  const testRe = testPattern || /\b(jest|vitest|pytest|mocha)\b|node --test|(npm|pnpm|yarn)( run)? test\b/;
+  const isTest = testMatcher({ testPattern, testCommands });
   const events = parseTranscript(lines);
   const result = [...events].reverse().find((e) => e.type === 'result');
   if (result) {
@@ -75,10 +76,10 @@ export function transcriptMetrics(lines, { testPattern } = {}) {
       m.tool_calls += 1;
       m.tools[block.name] = (m.tools[block.name] || 0) + 1;
       if (block.name === 'Agent' || block.name === 'Task') m.subagents += 1;
-      const cmd = block.input && typeof block.input.command === 'string' ? block.input.command : '';
-      if ((block.name === 'Bash' || block.name === 'PowerShell') && testRe.test(cmd)) m.tests_run += 1;
     }
   }
+  m.test_runs = collectTestRuns(events, isTest);
+  m.tests_run = m.test_runs.length;
   return m;
 }
 
@@ -120,6 +121,7 @@ export function buildIterationRow(i) {
   const apiS = round1(m.api_ms / 1000);
   const runS = round1(m.duration_ms / 1000);
   const headMoved = Boolean(i.headBefore && i.headAfter && i.headBefore !== i.headAfter);
+  const summary = summariseTestRuns(m.test_runs || []);
   const outcome = resolveOutcome({ status: i.status, headMoved, exitCode: i.exitCode });
   return {
     ts: new Date(i.endMs).toISOString(),
@@ -148,6 +150,10 @@ export function buildIterationRow(i) {
     tool_calls: m.tool_calls,
     tools: m.tools,
     tests_run: m.tests_run,
+    tests_summary: summary,
+    test_claim_mismatch: testClaimMismatch(`${i.status.did} ${i.status.result}`, summary),
+    // Per-run detail (capped): the command, how it ended and the counts parsed from its output; null = unknown.
+    test_runs: (m.test_runs || []).slice(0, 25),
     subagents: m.subagents,
     subagent_s: round1(m.subagent_ms / 1000),
     exit_code: i.exitCode,

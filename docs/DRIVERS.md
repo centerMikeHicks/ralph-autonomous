@@ -136,12 +136,19 @@ Written by Node only, BOM-free, appended with retry (Windows sharing violations)
 
 `iterations.jsonl` (one row per agent invocation that was not usage-limited): `ts, run, iter, branch,
 spec, mode, model, phase, outcome, status_fresh, committed, head_before, head_after, started_at,
-ended_at, dur_s, api_s, tool_s, overhead_s, gap_s, turns, tool_calls, tools, tests_run, subagents,
+ended_at, dur_s, api_s, tool_s, overhead_s, gap_s, turns, tool_calls, tools, tests_run, tests_summary, test_claim_mismatch, test_runs, subagents,
 subagent_s, exit_code, is_error, stop_reason, input, output, cache_r, cache_w, cost_usd, did, result,
 next, transcript`. `model` is `name (effort)`. `outcome` is the agent's, corrected to
 `committed(no-status)` when no fresh status exists but HEAD moved and to `error(exit N)` on a failing
 exit with no status. `api_s` is model time, `tool_s` the rest of the run, `overhead_s` wall minus run,
 `gap_s` idle time since the previous iteration ended.
+
+`tests_run` counts test invocations. `test_runs` records each one (up to 25): `command` (shortened, credentials
+blanked), `started_at`, `is_error`, `exit_code`, and `passed`, `failed`, `skipped`, `total`, `unit`, `parsed`
+read from its output (vitest, jest, pytest, `node --test`, nx; `null` when unknown, never 0). A command is a
+test run if it matches the default pattern or `commands.test` or `commands.affectedTest`. `tests_summary` is
+`{runs, passed, failed, unparsed, errored, no_result}`. `test_claim_mismatch` is true when the agent's `did`/`result`
+claims passing tests but no run was recorded or one failed.
 
 `USAGE_LOG.md`: the same facts as a markdown table. `loop-events.jsonl` rows are
 `{ts, run, event, ...}` with events `loop_start`, `iteration_start`, `iteration_end`, `push`,

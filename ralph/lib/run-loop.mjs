@@ -557,8 +557,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       const headAfter = runGit(root, ['rev-parse', 'HEAD']).out;
       const fpAfter = progressFingerprint({ root, planFile, stateDir: path.relative(root, stateDir) });
       const status = readIterationStatus(statusPath, startMs);
-      const testCmd = cfg.commands && typeof cfg.commands.test === 'string' ? cfg.commands.test : '';
-      const metrics = transcriptMetrics(lines, testCmd ? { testPattern: new RegExp(testCmd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) } : {});
+      const testCommands = [cfg.commands && cfg.commands.test, cfg.commands && cfg.commands.affectedTest];
+      const metrics = transcriptMetrics(lines, { testCommands });
       const row = buildIterationRow({
         run, iter, branch, specName, mode, modelLabel, startMs, endMs, gapS, exitCode: outcomeRun.exitCode,
         headBefore, headAfter, status, metrics, transcript: transcript ? path.relative(root, transcript).replace(/\\/g, '/') : '',
